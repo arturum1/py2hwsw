@@ -17,6 +17,8 @@ def setup(py_params_dict):
         "init_mem": True,
         "use_extmem": False,
         "use_ethernet": False,
+        # If set to false, removes bootrom and internal memories. Will force use_extmem to be true.
+        "internal_memories": True,
         "addr_w": 32,
         "data_w": 32,
         "mem_addr_w": 24,
@@ -26,6 +28,9 @@ def setup(py_params_dict):
     }
 
     update_params(params, py_params_dict)
+
+    if not params["internal_memories"]:
+        params["use_extmem"] = True
 
     attributes_dict = {
         "name": params["name"],
@@ -157,38 +162,41 @@ def setup(py_params_dict):
                 "type": "clk_en_rst",
             },
         },
-        {
-            "name": "rom_bus_io",
-            "descr": "Ports for connection with ROM memory",
-            "signals": [
-                {
-                    "name": "boot_rom_valid_o",
-                    "width": "1",
-                },
-                {
-                    "name": "boot_rom_addr_o",
-                    "width": params["bootrom_addr_w"] - 2,
-                },
-                {
-                    "name": "boot_rom_rdata_i",
-                    "width": params["data_w"],
-                },
-            ],
-        },
-        {
-            "name": "int_mem_axi_m",
-            "descr": "AXI master interface for internal memory",
-            "signals": {
-                "type": "axi",
-                "prefix": "int_mem_",
-                "ID_W": "AXI_ID_W",
-                "ADDR_W": f"{params['fw_addr_w']}-2",
-                "DATA_W": "AXI_DATA_W",
-                "LEN_W": "AXI_LEN_W",
-                "LOCK_W": 1,
-            },
-        },
     ]
+    if params["internal_memories"]:
+        attributes_dict["ports"] += [
+            {
+                "name": "rom_bus_io",
+                "descr": "Ports for connection with ROM memory",
+                "signals": [
+                    {
+                        "name": "boot_rom_valid_o",
+                        "width": "1",
+                    },
+                    {
+                        "name": "boot_rom_addr_o",
+                        "width": params["bootrom_addr_w"] - 2,
+                    },
+                    {
+                        "name": "boot_rom_rdata_i",
+                        "width": params["data_w"],
+                    },
+                ],
+            },
+            {
+                "name": "int_mem_axi_m",
+                "descr": "AXI master interface for internal memory",
+                "signals": {
+                    "type": "axi",
+                    "prefix": "int_mem_",
+                    "ID_W": "AXI_ID_W",
+                    "ADDR_W": f"{params['fw_addr_w']}-2",
+                    "DATA_W": "AXI_DATA_W",
+                    "LEN_W": "AXI_LEN_W",
+                    "LOCK_W": 1,
+                },
+            },
+        ]
     if params["use_extmem"]:
         attributes_dict["ports"] += [
             {
@@ -275,28 +283,33 @@ def setup(py_params_dict):
             "name": "unused_interconnect_bits",
             "descr": "Wires to connect to unused output bits of interconnect",
             "signals": [
-                {"name": "unused_m0_araddr_bits", "width": params["addr_w"] - params['fw_addr_w']},
-                {"name": "unused_m0_awaddr_bits", "width": params["addr_w"] - params['fw_addr_w']},
-                {"name": "unused_m1_araddr_bits", "width": f"{params['addr_w']} - AXI_ADDR_W"},
-                {"name": "unused_m1_awaddr_bits", "width": f"{params['addr_w']} - AXI_ADDR_W"},
-                {"name": "unused_m2_araddr_bits", "width": params["addr_w"] - (params['bootrom_addr_w'] + 1)},
-                {"name": "unused_m2_awaddr_bits", "width": params["addr_w"] - (params['bootrom_addr_w'] + 1)},
+                {
+                    "name": "unused_m0_araddr_bits",
+                    "width": params["addr_w"] - params["fw_addr_w"],
+                },
+                {
+                    "name": "unused_m0_awaddr_bits",
+                    "width": params["addr_w"] - params["fw_addr_w"],
+                },
+                {
+                    "name": "unused_m1_araddr_bits",
+                    "width": f"{params['addr_w']} - AXI_ADDR_W",
+                },
+                {
+                    "name": "unused_m1_awaddr_bits",
+                    "width": f"{params['addr_w']} - AXI_ADDR_W",
+                },
+                {
+                    "name": "unused_m2_araddr_bits",
+                    "width": params["addr_w"] - (params["bootrom_addr_w"] + 1),
+                },
+                {
+                    "name": "unused_m2_awaddr_bits",
+                    "width": params["addr_w"] - (params["bootrom_addr_w"] + 1),
+                },
                 {"name": "unused_m3_araddr_bits", "width": 2},
                 {"name": "unused_m3_awaddr_bits", "width": 2},
             ],
-        },
-        {
-            "name": "bootrom_cbus",
-            "descr": "iob-system boot controller data interface",
-            "signals": {
-                "type": "axi",
-                "prefix": "bootrom_",
-                "ID_W": "AXI_ID_W",
-                "ADDR_W": (params['bootrom_addr_w'] + 1) - 2, # +1 for csrs; -2 for lsbs
-                "DATA_W": "AXI_DATA_W",
-                "LEN_W": "AXI_LEN_W",
-                "LOCK_W": "1",
-            },
         },
         {
             "name": "axi_periphs_cbus",
@@ -325,6 +338,23 @@ def setup(py_params_dict):
         # Peripheral cbus wires added automatically
         # NOTE: Add other peripheral wires here
     ]
+    if params["internal_memories"]:
+        attributes_dict["wires"] += [
+            {
+                "name": "bootrom_cbus",
+                "descr": "iob-system boot controller data interface",
+                "signals": {
+                    "type": "axi",
+                    "prefix": "bootrom_",
+                    "ID_W": "AXI_ID_W",
+                    "ADDR_W": (params["bootrom_addr_w"] + 1)
+                    - 2,  # +1 for csrs; -2 for lsbs
+                    "DATA_W": "AXI_DATA_W",
+                    "LEN_W": "AXI_LEN_W",
+                    "LOCK_W": "1",
+                },
+            },
+        ]
     if not params["use_extmem"]:
         attributes_dict["wires"] += [
             {
@@ -391,48 +421,12 @@ def setup(py_params_dict):
             "parameters": {
                 "ID_W": "AXI_ID_W",
                 "LEN_W": "AXI_LEN_W",
-                # "INT_MEM_ADDR_W": f"{params['fw_addr_w']} - 2",
-                # "MEM_ADDR_W": "AXI_ADDR_W - 2",
             },
             "connect": {
                 "clk_en_rst_s": "clk_en_rst_s",
                 "rst_i": "rst",
                 "s0_axi_s": "cpu_ibus",
                 "s1_axi_s": "cpu_dbus",
-                "m0_axi_m": (
-                    "int_mem_axi_m",
-                    [
-                        "{unused_m0_araddr_bits, int_mem_axi_araddr_o}",
-                        "{unused_m0_awaddr_bits, int_mem_axi_awaddr_o}",
-                    ],
-                ),
-                "m1_axi_m": (
-                    "axi_m",
-                    (
-                        [
-                            "{unused_m1_araddr_bits, axi_araddr_o}",
-                            "{unused_m1_awaddr_bits, axi_awaddr_o}",
-                        ]
-                        if params["use_extmem"]
-                        else []
-                    ),
-                ),
-                "m2_axi_m": (
-                    "bootrom_cbus",
-                    [
-                        "{unused_m2_araddr_bits, bootrom_axi_araddr}",
-                        "{unused_m2_awaddr_bits, bootrom_axi_awaddr}",
-                    ],
-                ),
-                "m3_axi_m": (
-                    "axi_periphs_cbus",
-                    [
-                        "{unused_m3_araddr_bits, periphs_axi_araddr}",
-                        "{unused_m3_awaddr_bits, periphs_axi_awaddr}",
-                        "periphs_axi_awlock[0]",
-                        "periphs_axi_arlock[0]",
-                    ],
-                ),
             },
             "addr_w": params["addr_w"] - 2,
             "data_w": params["data_w"],
@@ -441,29 +435,90 @@ def setup(py_params_dict):
             "num_masters": 4,
         },
     ]
-    attributes_dict["subblocks"] += [
-        {
-            "core_name": "iob_bootrom",
-            "instance_name": "bootrom",
-            "instance_description": "Boot ROM peripheral",
-            "connect": {
-                "clk_en_rst_s": "clk_en_rst_s",
-                "cbus_s": (
-                    "bootrom_cbus",
+    if params["internal_memories"]:
+        attributes_dict["subblocks"][-1]["num_masters"] = 4
+        attributes_dict["subblocks"][-1]["connect"] |= {
+            "m0_axi_m": (
+                "int_mem_axi_m",
+                [
+                    "{unused_m0_araddr_bits, int_mem_axi_araddr_o}",
+                    "{unused_m0_awaddr_bits, int_mem_axi_awaddr_o}",
+                ],
+            ),
+            "m1_axi_m": (
+                "axi_m",
+                (
                     [
-                        "bootrom_axi_arid[0]",
-                        "bootrom_axi_rid[0]",
-                        "{1'b0, bootrom_axi_arlock}",
-                        "bootrom_axi_awid[0]",
-                        "bootrom_axi_bid[0]",
-                        "{1'b0, bootrom_axi_awlock}",
-                    ],
+                        "{unused_m1_araddr_bits, axi_araddr_o}",
+                        "{unused_m1_awaddr_bits, axi_awaddr_o}",
+                    ]
+                    if params["use_extmem"]
+                    else []
                 ),
-                "ext_rom_bus_io": "rom_bus_io",
-            },
-            "bootrom_addr_w": params["bootrom_addr_w"],
-            "soc_name": params["name"],
-        },
+            ),
+            "m2_axi_m": (
+                "bootrom_cbus",
+                [
+                    "{unused_m2_araddr_bits, bootrom_axi_araddr}",
+                    "{unused_m2_awaddr_bits, bootrom_axi_awaddr}",
+                ],
+            ),
+            "m3_axi_m": (
+                "axi_periphs_cbus",
+                [
+                    "{unused_m3_araddr_bits, periphs_axi_araddr}",
+                    "{unused_m3_awaddr_bits, periphs_axi_awaddr}",
+                    "periphs_axi_awlock[0]",
+                    "periphs_axi_arlock[0]",
+                ],
+            ),
+        }
+    else:  # No internal memories
+        attributes_dict["subblocks"][-1]["num_masters"] = 2
+        attributes_dict["subblocks"][-1]["connect"] |= {
+            "m0_axi_m": (
+                "axi_m",
+                [
+                    "{unused_m1_araddr_bits, axi_araddr_o}",
+                    "{unused_m1_awaddr_bits, axi_awaddr_o}",
+                ],
+            ),
+            "m1_axi_m": (
+                "axi_periphs_cbus",
+                [
+                    "{unused_m3_araddr_bits, periphs_axi_araddr}",
+                    "{unused_m3_awaddr_bits, periphs_axi_awaddr}",
+                    "periphs_axi_awlock[0]",
+                    "periphs_axi_arlock[0]",
+                ],
+            ),
+        }
+    if params["internal_memories"]:
+        attributes_dict["subblocks"] += [
+            {
+                "core_name": "iob_bootrom",
+                "instance_name": "bootrom",
+                "instance_description": "Boot ROM peripheral",
+                "connect": {
+                    "clk_en_rst_s": "clk_en_rst_s",
+                    "cbus_s": (
+                        "bootrom_cbus",
+                        [
+                            "bootrom_axi_arid[0]",
+                            "bootrom_axi_rid[0]",
+                            "{1'b0, bootrom_axi_arlock}",
+                            "bootrom_axi_awid[0]",
+                            "bootrom_axi_bid[0]",
+                            "{1'b0, bootrom_axi_awlock}",
+                        ],
+                    ),
+                    "ext_rom_bus_io": "rom_bus_io",
+                },
+                "bootrom_addr_w": params["bootrom_addr_w"],
+                "soc_name": params["name"],
+            }
+        ]
+    attributes_dict["subblocks"] += [
         {
             "core_name": "iob_axi2iob",
             "instance_name": "periphs_axi2iob",
