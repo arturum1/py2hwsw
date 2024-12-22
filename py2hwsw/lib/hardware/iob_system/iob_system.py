@@ -154,6 +154,17 @@ def setup(py_params_dict):
             },
         ],
     }
+    if not params["internal_memories"]:
+        attributes_dict["confs"] += [
+            {
+                "name": "CPU_RESET_ADDR",
+                "descr": "CPU reset address",
+                "type": "P",
+                "val": "32'h00000000",
+                "min": "NA",
+                "max": "NA",
+            },
+        ]
     attributes_dict["ports"] = [
         {
             "name": "clk_en_rst_s",
@@ -412,7 +423,12 @@ def setup(py_params_dict):
                     ["clint_cbus_iob_addr[16-2-1:0]"],
                 ),
             },
-        },
+        }
+    ]
+    if not params["internal_memories"]:
+        attributes_dict["subblocks"][-1]["parameters"]["RESET_ADDR"] = "CPU_RESET_ADDR"
+        # TODO: Update vexriscv to support this verilog parameter
+    attributes_dict["subblocks"] += [
         {
             "core_name": "iob_axi_interconnect2",
             "name": params["name"] + "_axi_interconnect",
