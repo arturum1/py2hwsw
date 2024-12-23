@@ -24,6 +24,50 @@ def setup(py_params_dict):
         "fw_addr": 0,
         "fw_addr_w": 15,
     }
+    # CPU python parameter
+    params |= {
+        "cpu": {
+            "core_name": "iob_vexriscv",
+            "parameters": {
+                "AXI_ID_W": "1",
+                "AXI_ADDR_W": params["addr_w"],
+                "AXI_DATA_W": params["data_w"],
+                "AXI_LEN_W": "AXI_LEN_W",
+            },
+            # NOTE: Current version of iob_system expects the CPU to contain PLIC and CLINT modules.
+            "connect": {
+                "clk_en_rst_s": "clk_en_rst_s",
+                "rst_i": "rst",
+                "i_bus_m": (
+                    "cpu_ibus",
+                    [
+                        "cpu_i_axi_arid[0]",
+                        "cpu_i_axi_rid[0]",
+                        "cpu_i_axi_awid[0]",
+                        "cpu_i_axi_bid[0]",
+                    ],
+                ),
+                "d_bus_m": (
+                    "cpu_dbus",
+                    [
+                        "cpu_d_axi_arid[0]",
+                        "cpu_d_axi_rid[0]",
+                        "cpu_d_axi_awid[0]",
+                        "cpu_d_axi_bid[0]",
+                    ],
+                ),
+                "plic_interrupts_i": "interrupts",
+                "plic_cbus_s": (
+                    "plic_cbus",
+                    ["plic_cbus_iob_addr[22-2-1:0]"],
+                ),
+                "clint_cbus_s": (
+                    "clint_cbus",
+                    ["clint_cbus_iob_addr[16-2-1:0]"],
+                ),
+            },
+        },
+    }
 
     update_params(params, py_params_dict)
 
@@ -275,12 +319,30 @@ def setup(py_params_dict):
             "name": "unused_interconnect_bits",
             "descr": "Wires to connect to unused output bits of interconnect",
             "signals": [
-                {"name": "unused_m0_araddr_bits", "width": params["addr_w"] - params['fw_addr_w']},
-                {"name": "unused_m0_awaddr_bits", "width": params["addr_w"] - params['fw_addr_w']},
-                {"name": "unused_m1_araddr_bits", "width": f"{params['addr_w']} - AXI_ADDR_W"},
-                {"name": "unused_m1_awaddr_bits", "width": f"{params['addr_w']} - AXI_ADDR_W"},
-                {"name": "unused_m2_araddr_bits", "width": params["addr_w"] - (params['bootrom_addr_w'] + 1)},
-                {"name": "unused_m2_awaddr_bits", "width": params["addr_w"] - (params['bootrom_addr_w'] + 1)},
+                {
+                    "name": "unused_m0_araddr_bits",
+                    "width": params["addr_w"] - params["fw_addr_w"],
+                },
+                {
+                    "name": "unused_m0_awaddr_bits",
+                    "width": params["addr_w"] - params["fw_addr_w"],
+                },
+                {
+                    "name": "unused_m1_araddr_bits",
+                    "width": f"{params['addr_w']} - AXI_ADDR_W",
+                },
+                {
+                    "name": "unused_m1_awaddr_bits",
+                    "width": f"{params['addr_w']} - AXI_ADDR_W",
+                },
+                {
+                    "name": "unused_m2_araddr_bits",
+                    "width": params["addr_w"] - (params["bootrom_addr_w"] + 1),
+                },
+                {
+                    "name": "unused_m2_awaddr_bits",
+                    "width": params["addr_w"] - (params["bootrom_addr_w"] + 1),
+                },
                 {"name": "unused_m3_araddr_bits", "width": 2},
                 {"name": "unused_m3_awaddr_bits", "width": 2},
             ],
@@ -292,7 +354,8 @@ def setup(py_params_dict):
                 "type": "axi",
                 "prefix": "bootrom_",
                 "ID_W": "AXI_ID_W",
-                "ADDR_W": (params['bootrom_addr_w'] + 1) - 2, # +1 for csrs; -2 for lsbs
+                "ADDR_W": (params["bootrom_addr_w"] + 1)
+                - 2,  # +1 for csrs; -2 for lsbs
                 "DATA_W": "AXI_DATA_W",
                 "LEN_W": "AXI_LEN_W",
                 "LOCK_W": "1",
@@ -342,46 +405,11 @@ def setup(py_params_dict):
         ]
     attributes_dict["subblocks"] = [
         {
-            "core_name": "iob_vexriscv",
+            "core_name": params["cpu"]["core_name"],
             "instance_name": "cpu",
-            "instance_description": "RISC-V CPU instance",
-            "parameters": {
-                "AXI_ID_W": "1",
-                "AXI_ADDR_W": params["addr_w"],
-                "AXI_DATA_W": params["data_w"],
-                "AXI_LEN_W": "AXI_LEN_W",
-            },
-            "connect": {
-                "clk_en_rst_s": "clk_en_rst_s",
-                "rst_i": "rst",
-                "i_bus_m": (
-                    "cpu_ibus",
-                    [
-                        "cpu_i_axi_arid[0]",
-                        "cpu_i_axi_rid[0]",
-                        "cpu_i_axi_awid[0]",
-                        "cpu_i_axi_bid[0]",
-                    ],
-                ),
-                "d_bus_m": (
-                    "cpu_dbus",
-                    [
-                        "cpu_d_axi_arid[0]",
-                        "cpu_d_axi_rid[0]",
-                        "cpu_d_axi_awid[0]",
-                        "cpu_d_axi_bid[0]",
-                    ],
-                ),
-                "plic_interrupts_i": "interrupts",
-                "plic_cbus_s": (
-                    "plic_cbus",
-                    ["plic_cbus_iob_addr[22-2-1:0]"],
-                ),
-                "clint_cbus_s": (
-                    "clint_cbus",
-                    ["clint_cbus_iob_addr[16-2-1:0]"],
-                ),
-            },
+            "instance_description": "CPU instance",
+            "parameters": params["cpu"]["parameters"],
+            "connect": params["cpu"]["connect"],
         },
         {
             "core_name": "iob_axi_interconnect2",
