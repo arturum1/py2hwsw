@@ -267,24 +267,11 @@ def setup(py_params_dict):
             },
         },
         {
-            "name": "cpu_dbus1",
-            "descr": "CPU data bus",
+            "name": "cpu_bus",
+            "descr": "CPU debug bus",
             "signals": {
                 "type": "axi",
-                "prefix": "cpu_d1_",
-                "ID_W": "AXI_ID_W",
-                "ADDR_W": params["addr_w"] - 2,
-                "DATA_W": params["data_w"],
-                "LEN_W": "AXI_LEN_W",
-                "LOCK_W": "1",
-            },
-        },
-        {
-            "name": "cpu_dbus2",
-            "descr": "CPU data bus",
-            "signals": {
-                "type": "axi",
-                "prefix": "cpu_d2_",
+                "prefix": "cpu_",
                 "ID_W": "AXI_ID_W",
                 "ADDR_W": params["addr_w"] - 2,
                 "DATA_W": params["data_w"],
@@ -431,21 +418,21 @@ def setup(py_params_dict):
             },
         },
         {
-            "core_name": "iob_axi_split",
-            "name": f"{py_params_dict['name']}_axi_split",
-            "instance_name": "iob_axi_split_debug",
-            "instance_description": "AXI split for debug",
+            "core_name": "iob_axi_merge",
+            "name": f"{py_params_dict['name']}_axi_merge",
+            "instance_name": "iob_axi_merge_debug",
+            "instance_description": "AXI merge for debug",
             "parameters": {
                 "ID_W": "AXI_ID_W",
                 "LEN_W": "AXI_LEN_W",
             },
-            "num_outputs": 2,
+            "num_inputs": 2,
             "connect": {
                 "clk_en_rst_s": "clk_en_rst_s",
                 "reset_i": "rst",
-                "input_s": "cpu_dbus",
-                "output_0_m": "cpu_dbus1",
-                "output_1_m": "cpu_dbus2",
+                "input_0_s": "cpu_ibus",
+                "input_1_s": "cpu_dbus",
+                "output_m": "cpu_bus",
             },
         },
         {
@@ -462,9 +449,7 @@ def setup(py_params_dict):
             "connect": {
                 "clk_i": "clk",
                 "rst_i": "rst",
-                "s0_axi_s": "cpu_ibus",
-                "s1_axi_s": "cpu_dbus1",
-                "s2_axi_s": "cpu_dbus2",
+                "s0_axi_s": "cpu_bus",
                 "int_mem_axi_m": (
                     "int_mem_axi_m",
                     [
@@ -500,7 +485,7 @@ def setup(py_params_dict):
                     ],
                 ),
             },
-            "num_slaves": 3,
+            "num_slaves": 1,
             "masters": {
                 "int_mem": params["addr_w"] - 2 - 2,
                 "mem": params["addr_w"] - 2 - 2,
