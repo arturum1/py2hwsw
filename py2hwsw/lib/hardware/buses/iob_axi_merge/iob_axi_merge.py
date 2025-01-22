@@ -535,7 +535,7 @@ def setup(py_params_dict):
 
    // Only switch masters when there is no current active transaction
    assign read_sel = busy_read_reg_o ? read_sel_reg : read_prio_enc_o;
-   assign busy_read_reg_en = m_axi_arvalid_o & !busy_read_reg_o;
+   assign busy_read_reg_en = m_axi_arvalid_o & m_axi_arready_i & !busy_read_reg_o;
    assign busy_read_reg_rst = (m_axi_rlast_i & m_axi_rvalid_i & m_axi_rready_o) | rst_i;
    assign busy_read_reg_i = 1'b1;
 
@@ -549,7 +549,7 @@ def setup(py_params_dict):
 
    // Only switch masters when there is no current active transaction
    assign write_sel = busy_write_reg_o ? write_sel_reg : write_prio_enc_o;
-   assign busy_write_reg_en = m_axi_awvalid_o & !busy_write_reg_o;
+   assign busy_write_reg_en = m_axi_awvalid_o & m_axi_awready_i & !busy_write_reg_o;
    assign busy_write_reg_rst = (m_axi_bvalid_i & m_axi_bready_o) | rst_i;
    assign busy_write_reg_i = 1'b1;
 

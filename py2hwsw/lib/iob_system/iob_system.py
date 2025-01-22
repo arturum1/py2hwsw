@@ -426,13 +426,13 @@ def setup(py_params_dict):
                 "ID_W": "AXI_ID_W",
                 "LEN_W": "AXI_LEN_W",
             },
-            "num_inputs": 2,
+            "num_slaves": 2,
             "connect": {
                 "clk_en_rst_s": "clk_en_rst_s",
                 "reset_i": "rst",
-                "input_0_s": "cpu_ibus",
-                "input_1_s": "cpu_dbus",
-                "output_m": "cpu_bus",
+                "s_0_s": "cpu_ibus",
+                "s_1_s": "cpu_dbus",
+                "m_m": "cpu_bus",
             },
         },
         {
