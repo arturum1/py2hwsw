@@ -267,6 +267,19 @@ def setup(py_params_dict):
             },
         },
         {
+            "name": "merge_split",
+            "descr": "debug bus",
+            "signals": {
+                "type": "axi",
+                "prefix": "merge_split_",
+                "ID_W": "AXI_ID_W",
+                "ADDR_W": params["addr_w"] - 2,
+                "DATA_W": params["data_w"],
+                "LEN_W": "AXI_LEN_W",
+                "LOCK_W": "1",
+            },
+        },
+        {
             "name": "interrupts",
             "descr": "System interrupts",
             "signals": [
@@ -405,61 +418,44 @@ def setup(py_params_dict):
             },
         },
         {
-            "core_name": "iob_axi_interconnect2",
-            "name": params["name"] + "_axi_interconnect",
-            "instance_name": "iob_axi_interconnect",
-            "instance_description": "AXI interconnect instance",
+            "core_name": "iob_axi_merge",
+            "name": f"{py_params_dict['name']}_axi_merge",
+            "instance_name": "iob_axi_merge_debug",
+            "instance_description": "AXI merge for debug",
+            "addr_w": params["addr_w"] - 2 + 1,
             "parameters": {
                 "ID_W": "AXI_ID_W",
                 "LEN_W": "AXI_LEN_W",
-                # "INT_MEM_ADDR_W": f"{params['fw_addr_w']} - 2",
-                # "MEM_ADDR_W": "AXI_ADDR_W - 2",
             },
+            "num_slaves": 2,
             "connect": {
                 "clk_en_rst_s": "clk_en_rst_s",
-                "rst_i": "rst",
-                "s0_axi_s": "cpu_ibus",
-                "s1_axi_s": "cpu_dbus",
-                "m0_axi_m": (
-                    "int_mem_axi_m",
-                    [
-                        "{unused_m0_araddr_bits, int_mem_axi_araddr_o}",
-                        "{unused_m0_awaddr_bits, int_mem_axi_awaddr_o}",
-                    ],
-                ),
-                "m1_axi_m": (
-                    "axi_m",
-                    (
-                        [
-                            "{unused_m1_araddr_bits, axi_araddr_o}",
-                            "{unused_m1_awaddr_bits, axi_awaddr_o}",
-                        ]
-                        if params["use_extmem"]
-                        else []
-                    ),
-                ),
-                "m2_axi_m": (
-                    "bootrom_cbus",
-                    [
-                        "{unused_m2_araddr_bits, bootrom_axi_araddr}",
-                        "{unused_m2_awaddr_bits, bootrom_axi_awaddr}",
-                    ],
-                ),
-                "m3_axi_m": (
-                    "axi_periphs_cbus",
-                    [
-                        "{unused_m3_araddr_bits, periphs_axi_araddr}",
-                        "{unused_m3_awaddr_bits, periphs_axi_awaddr}",
-                        "periphs_axi_awlock[0]",
-                        "periphs_axi_arlock[0]",
-                    ],
-                ),
+                "reset_i": "rst",
+                "s_0_s": "cpu_ibus",
+                "s_1_s": "cpu_dbus",
+                "m_m": "merge_split",
+            },
+        },
+        {
+            "core_name": "iob_axi_split",
+            "name": f"{py_params_dict['name']}_axi_split",
+            "instance_name": "iob_axi_split_debug",
+            "instance_description": "AXI split for debug",
+            "parameters": {
+                "ID_W": "AXI_ID_W",
+                "LEN_W": "AXI_LEN_W",
             },
             "addr_w": params["addr_w"] - 2,
-            "data_w": params["data_w"],
-            "lock_w": 1,
-            "num_slaves": 2,
             "num_masters": 4,
+            "connect": {
+                "clk_en_rst_s": "clk_en_rst_s",
+                "reset_i": "rst",
+                "s_s": "merge_split",
+                "m_0_m": "int_mem_axi_m",
+                "m_1_m": "axi_m",
+                "m_2_m": "bootrom_cbus",
+                "m_3_m": "axi_periphs_cbus",
+            },
         },
     ]
     attributes_dict["subblocks"] += [
