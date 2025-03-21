@@ -875,15 +875,18 @@ class iob_core(iob_module, iob_instance):
             print(f"- {name}:{align_spaces}{datatype}{align_spaces2}{descr}")
 
     @staticmethod
-    def get_core_obj(core_name, **kwargs):
+    def get_core_obj(core_name, search_dirs=[], **kwargs):
         """Generate an instance of a core based on given core_name and python parameters
         This method will search for the .py and .json files of the core, and generate a
         python object based on info stored in those files, and info passed via python
         parameters.
         Calling this method may also begin the setup process of the core, depending on
         the value of the `global_special_target` attribute.
+        :param core_name str: Name of the core to generate
+        :param search_dirs: Optional list of paths to search for the core files instead of default.
+        :param kwargs: Optional Python Parameters to pass to the core.
         """
-        core_dir, file_ext = find_module_setup_dir(core_name)
+        core_dir, file_ext = find_module_setup_dir(core_name, search_dirs=search_dirs)
 
         if file_ext == ".py":
             import_python_module(
@@ -977,24 +980,38 @@ def find_common_deep(path1, path2):
     )
 
 
-def find_module_setup_dir(core_name):
+def find_module_setup_dir(core_name, search_dirs=[]):
     """Searches for a core's setup directory
     param core_name: The core_name object
+    param search_dirs: Optional search directories to use instead of the default ones.
     returns: The path to the setup directory
     returns: The file extension
     """
-    file_path = find_file(
-        iob_core.global_project_root, core_name, [".py", ".json"]
-    ) or find_file(
-        os.path.join(os.path.dirname(__file__), ".."),
-        core_name,
-        [".py", ".json"],
-    )
-    if not file_path:
-        fail_with_msg(
-            f"Python/JSON setup file of '{core_name}' core not found under path '{iob_core.global_project_root}'!",
-            ModuleNotFoundError,
+    file_path = None
+    if search_dirs:
+        for dir in search_dirs:
+            file_path = find_file(dir, core_name, [".py", ".json"])
+            if file_path:
+                break
+        if not file_path:
+            prefix_str = "\n- "
+            fail_with_msg(
+                f"Python/JSON setup file of '{core_name}' core not found under paths:{prefix_str}{prefix_str.join(search_dirs)}",
+                ModuleNotFoundError,
+            )
+    else:  # Use default search dirs
+        file_path = find_file(
+            iob_core.global_project_root, core_name, [".py", ".json"]
+        ) or find_file(
+            os.path.join(os.path.dirname(__file__), ".."),
+            core_name,
+            [".py", ".json"],
         )
+        if not file_path:
+            fail_with_msg(
+                f"Python/JSON setup file of '{core_name}' core not found under path '{iob_core.global_project_root}'!",
+                ModuleNotFoundError,
+            )
 
     file_ext = os.path.splitext(file_path)[1]
 

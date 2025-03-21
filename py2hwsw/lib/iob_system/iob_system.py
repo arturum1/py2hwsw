@@ -687,7 +687,11 @@ def setup(py_params_dict):
             "core_name": "iob_tasks",
             "instance_name": "iob_tasks_inst",
             "instantiate": False,
-            "dest_dir": "hardware/simulation/src",
+            # Flow modules must be inside setup dir of core as specified here:
+            # https://github.com/IObundle/py2hwsw/issues/167
+            # Since this module is not inside setup dir of this core, it cant be considered as a flow module (cant have dest_dir for simulation).
+            # "dest_dir": "hardware/simulation/src",
+            # This module will be deprecated by new universal testbench.
         },
     ]
     attributes_dict["superblocks"] = [

@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: MIT
 
 from dataclasses import dataclass, field
+import os
+
 from iob_base import (
     str_to_kwargs,
     fail_with_msg,
@@ -129,6 +131,7 @@ def create_block(core, core_name: str = "", instance_name: str = "", **kwargs):
     """
     # Don't setup other destinations (like simulation) if this is a submodule and
     # the sub-submodule (we are trying to setup) is not for hardware/src/
+    # This prevents setting up flow modules of sub-modules.
     if (
         not core.is_top_module
         and not core.is_superblock
@@ -147,13 +150,22 @@ def create_block(core, core_name: str = "", instance_name: str = "", **kwargs):
     # Ensure global top module is set
     core.update_global_top_module()
 
+    search_dirs = []
+    # If we are setting up a flow module, only search for it in 'hardware/' folder of this core.
+    if kwargs.get("dest_dir", "hardware/src") != "hardware/src":
+        search_dirs = [os.path.join(core.setup_dir, "hardware")]
+
     # Set submodule destination dir equal to current module
     if "dest_dir" not in kwargs:
         kwargs["dest_dir"] = core.dest_dir
 
     try:
         instance = core.get_core_obj(
-            core_name, instance_name=instance_name, instantiator=core, **kwargs
+            core_name,
+            instance_name=instance_name,
+            instantiator=core,
+            search_dirs=search_dirs,
+            **kwargs,
         )
 
         return instance
