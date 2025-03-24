@@ -201,6 +201,7 @@ def setup(py_params_dict):
                     "rs232_m": "rs232_m",
                 },
             },
+            # TODO: How should we handle this 'flow' block? Should it be in the top module's root directory (iob_uart)? Or should it be sourced from py2's lib as currently done?
             {
                 "core_name": "iob_clock",
                 "instance_name": "iob_clk_inst",
@@ -220,6 +221,8 @@ def setup(py_params_dict):
             },
         ],
         "superblocks": [
+            # TODO: How should we handle this 'flow' block? Should it be somewhre under the hardware/ folder? Or can it stay in the iob_uart_tester/ folder?
+            # If it can stay under the tester folder, what other folders could 'flow' modules be in? I assume not in the 'submodules' folder.
             {
                 "core_name": "iob_uart_tester",
                 "dest_dir": "tester",
