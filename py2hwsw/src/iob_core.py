@@ -15,14 +15,9 @@ import copy_srcs
 import config_gen
 import param_gen
 import io_gen
-import bus_gen
 import block_gen
-import comb_gen
-import fsm_gen
 import snippet_gen
-import doc_gen
 import verilog_gen
-import ipxact_gen
 import wire_gen
 
 from iob_base import (
@@ -30,23 +25,17 @@ from iob_base import (
     find_file,
     nix_permission_hack,
     update_obj_from_dict,
-    parse_short_notation_text,
     find_common_deep,
 )
 from py2hwsw_version import PY2HWSW_VERSION
 import sw_tools
 import verilog_format
 import verilog_lint
-from manage_headers import generate_headers
 
 from iob_module import iob_module
-from iob_comb import iob_comb
 from iob_conf import iob_conf
-from iob_fsm import iob_fsm
-from iob_interface import iob_interface
 from iob_wire import iob_wire
 from iob_port import iob_port
-from iob_bus import iob_bus
 from iob_snippet import iob_snippet
 from iob_license import iob_license
 from iob_parameter import iob_parameter_group
@@ -75,18 +64,14 @@ class iob_core(iob_module):
                     The core's generated verilog module, sources, and files will have this name.
                     If the core has files in its setup directory, containing strings matching the 'original_name', they will all be renamed to this 'name' when copied to the build directory.
         description (str): Description of the module.
-        reset_polarity (str): Global reset polarity of the module. Can be 'positive' or 'negative'. (Will override all subblocks' reset polarities).
         confs (list): List of module macros and Verilog (false-)parameters
         wires (list): List of module wires
         ports (list): List of module ports
         buses (list): List of module buses
         interfaces (list): List of module interfaces
         snippets (list): List of Verilog code snippets
-        comb (iob_comb): Combinational circuit
-        fsm (iob_fsm): Finite state machine
         subblocks (list): List of instances of other cores inside this core.
         superblocks (list): List of wrappers for this core. Will only be setup if this core is a top module, or a wrapper of the top module.
-        sw_modules (list): List of software modules required by this core.
 
         # Core attributes
         version (str): Core version. By default is the same as Py2HWSW version.
@@ -148,18 +133,12 @@ class iob_core(iob_module):
         self.original_name: str = None
         self.name: str = ""
         self.description: str = "Default description"
-        self.reset_polarity: str = "positive"
         self.confs: list[iob_conf] = []
         self.wires: list[iob_wire] = []
         self.ports: list[iob_port] = []
-        self.buses: list[iob_bus] = []
-        self.interfaces: list[iob_interface] = []
         self.snippets: list[iob_snippet] = []
-        self.comb: iob_comb | None = None
-        self.fsm: iob_fsm | None = None
         self.subblocks: list[iob_instance] = []
         self.superblocks: list[iob_core] = []
-        self.sw_modules: list[iob_core] = []
 
         # Core attributes
         self.version: str = PY2HWSW_VERSION
@@ -206,11 +185,9 @@ class iob_core(iob_module):
             core_dict_with_objects["confs"] = [iob_conf.create_from_dict(i) for i in core_dictionary.get("confs", [])]
             core_dict_with_objects["ports"] = [iob_port.create_from_dict(i) for i in core_dictionary.get("ports", [])]
             core_dict_with_objects["wires"] = [iob_wire.create_from_dict(i) for i in core_dictionary.get("wires", [])]
-            core_dict_with_objects["buses"] = [iob_bus.create_from_dict(i) for i in core_dictionary.get("buses", [])]
             core_dict_with_objects["snippets"] = [iob_snippet.create_from_dict(i) for i in core_dictionary.get("snippets", [])]
             core_dict_with_objects["subblocks"] = [iob_instance.create_from_dict(i) for i in core_dictionary.get("subblocks", [])]
             core_dict_with_objects["superblocks"] = [__class__.create_from_dict(i) for i in core_dictionary.get("superblocks", [])]
-            core_dict_with_objects["sw_modules"] = [__class__.create_from_dict(i) for i in core_dictionary.get("sw_modules", [])]
             core_dict_with_objects["iob_parameters"] = [iob_parameter_group.create_from_dict(i) for i in core_dictionary.get("iob_parameters", [])]
             update_obj_from_dict(self, core_dict_with_objects)  # valid_attributes_list=...)
 
@@ -287,32 +264,6 @@ class iob_core(iob_module):
         # Generate configuration files
         config_gen.generate_confs(self)
 
-        # Generate parameters and local parameters
-        param_gen.generate_params_snippets(self)
-        param_gen.generate_localparams_snippets(self)
-
-        # Generate ios
-        io_gen.generate_ports_snippet(self)
-
-        # Generate wires
-        wire_gen.generate_wires_snippet(self)
-
-        # Generate buses
-        # bus_gen.generate_buses_snippet(self)
-
-        # Generate instances
-        if self.generate_hw:
-            block_gen.generate_subblocks_snippet(self)
-
-        # Generate comb
-        comb_gen.generate_comb_snippet(self)
-
-        # Generate fsm
-        fsm_gen.generate_fsm_snippet(self)
-
-        # Generate snippets
-        snippet_gen.generate_snippets_snippet(self)
-
         # Generate main Verilog module
         if self.generate_hw:
             verilog_gen.generate_verilog(self)
@@ -333,8 +284,6 @@ class iob_core(iob_module):
 
     def post_setup(self):
         """Scripts to run at the end of the top module's setup"""
-        # Replace Verilog snippet includes
-        self.__replace_snippet_includes()
         # Clean duplicate sources in `hardware/src` and its subfolders (like `hardware/simulation/src`)
         self.__remove_duplicate_sources()
         if self.is_tester:
@@ -354,33 +303,11 @@ class iob_core(iob_module):
             # Run post setup callbacks
             for callback in __class__.global_post_setup_callbacks:
                 callback()
-        # Generate docs
-        doc_gen.generate_docs(self)
-        # Generate ipxact file
 
-        # FIXME: IPXACT disabled during wires/buses/global_wires/ports/interfaces rework
-        #ipxact_gen.generate_ipxact_xml(self, self.build_dir + "/ipxact")
-
-        # Remove 'iob_v_tb.v' from build dir if 'iob_v_tb.vh' does not exist
-        sim_src_dir = "hardware/simulation/src"
-        if "iob_v_tb.vh" not in os.listdir(os.path.join(self.build_dir, sim_src_dir)):
-            os.remove(f"{self.build_dir}/{sim_src_dir}/iob_v_tb.v")
         # Lint and format sources
         self.lint_and_format()
         print(
             f"{iob_colors.INFO}Setup of '{self.original_name}' core successful. Generated build directory: '{self.build_dir}'.{iob_colors.ENDC}"
-        )
-        # Add SPDX license headers to every file in build dir
-        custom_header = f"Py2HWSW Version {PY2HWSW_VERSION} has generated this code (https://github.com/IObundle/py2hwsw)."
-        generate_headers(
-            root=self.build_dir,
-            copyright_holder=self.license.author,
-            copyright_year=self.license.year,
-            license_name=self.license.name,
-            header_template="spdx",
-            custom_header_suffix=custom_header,
-            skip_existing_headers=True,
-            verbose=False,
         )
 
     def __create_build_dir(self):
@@ -416,11 +343,6 @@ class iob_core(iob_module):
             for src in common_srcs:
                 os.remove(os.path.join(self.build_dir, subfolder, src))
                 # print(f'{iob_colors.INFO}Removed duplicate source: {os.path.join(subfolder, src)}{iob_colors.ENDC}')
-
-    def __replace_snippet_includes(self):
-        verilog_gen.replace_includes(
-            self.setup_dir, self.build_dir, self.ignore_snippets
-        )
 
     def lint_and_format(self):
         """Run Linters and Formatters in setup and build directories."""
@@ -547,18 +469,12 @@ class iob_core(iob_module):
                 - original_name -> iob_module.original_name
                 - name -> iob_module.name
                 - description -> iob_module.description
-                - reset_polarity -> iob_module.reset_polarity
                 - confs -> iob_module.confs = [iob_conf.create_from_dict(i) for i in confs]
                 - wires -> iob_module.wires = [iob_wire.create_from_dict(i) for i in wires]
                 - ports -> iob_module.ports = [iob_port.create_from_dict(i) for i in ports]
-                - buses -> iob_module.buses = [iob_bus.create_from_dict(i) for i in buses]
-                - interfaces -> iob_module.interfaces = [iob_interface.create_from_dict(i) for i in interfaces]
                 - snippets -> iob_module.snippets = [iob_snippet.create_from_dict(i) for i in snippets]
-                - comb -> iob_module.comb = iob_comb.create_from_dict(comb)
-                - fsm -> iob_module.fsm = iob_fsm.create_from_dict(fsm)
                 - subblocks -> iob_module.subblocks = [iob_instance.create_from_dict(i) for i in subblocks]
                 - superblocks -> iob_module.superblocks = [iob_core.create_from_dict(i) for i in superblocks]
-                - sw_modules -> iob_module.sw_modules = [iob_core.create_from_dict(i) for i in sw_modules]
 
                 # Core keys
                 - version -> iob_core.version
@@ -585,89 +501,3 @@ class iob_core(iob_module):
             iob_core: iob_core object
         """
         return iob_core(core_dict)
-
-    @staticmethod
-    def core_text2dict(core_text):
-        """Convert core short notation text to dictionary.
-        Atributes:
-            core_text (str): Short notation text. See `create_from_text` for format.
-
-        Returns:
-            dict: Dictionary with core attributes.
-        """
-        core_flags = [
-            # iob_module attributes
-            "original_name",
-            "name",
-            ['-d', {'dest': 'descr'}],
-            ['--rst_pol', {'dest': 'rst_policy'}],
-            ['--conf', {'dest': 'confs', 'action': 'append'}],
-            ['--port', {'dest': 'ports', 'action': 'append'}],
-            ['--bus', {'dest': 'buses', 'action': 'append'}],
-            ['--snippet', {'dest': 'snippets', 'action': 'append'}],
-            ['--comb', {'dest': 'comb'}],
-            ['--fsm', {'dest': 'fsm'}],
-            ['--subblock', {'dest': 'subblocks', 'action': 'append'}],
-            ['--superblock', {'dest': 'superblocks', 'action': 'append'}],
-            ['--sw_module', {'dest': 'sw_modules', 'action': 'append'}],
-            # iob_instance attributes
-            ['--inst_name', {'dest': 'instance_name'}],
-            ['--inst_d', {'dest': 'instance_description'}],
-            ['-c', {'dest': 'connect', 'action': 'append'}],  # port:ext format
-            ['--param', {'dest': 'parameters', 'action': 'append'}],  # PARAM:VALUE format
-            ['--no-instantiate', {'dest': 'instantiate', 'action': 'store_false'}],
-            ['--dest_dir', {'dest': 'dest_dir'}],
-            # iob_core attributes
-            ['-v', {'dest': 'version'}],
-            ['--prev_v', {'dest': 'previous_version'}],
-            ['--setup_dir', {'dest': 'setup_dir'}],
-            ['--build_dir', {'dest': 'build_dir'}],
-            ['--use_netlist', {'dest': 'use_netlist', 'action': 'store_true'}],
-            ['--system', {'dest': 'is_system', 'action': 'store_true'}],
-            ['--board', {'dest': 'board_list', 'action': 'append'}],
-            ['--ignore_snippet', {'dest': 'ignore_snippets', 'action': 'append'}],
-            ['--gen_hw', {'dest': 'generate_hw', 'action': 'store_true'}],
-            ['--parent', {'dest': 'parent'}],
-            ['--tester', {'dest': 'is_tester', 'action': 'store_true'}],
-            ['--iob_param', {'dest': 'iob_parameters', 'action': 'append'}],
-            ['--lic', {'dest': 'license'}],
-            ['--doc_conf', {'dest': 'doc_conf'}],
-            ['--title', {'dest': 'title'}],
-        ]
-        core_dict = parse_short_notation_text(core_text, core_flags)
-        # TODO: process core_dict:
-        #   - confs, ports, buses, snippets, comb, fsm,
-        #   - subblocks, superblocks, sw_modules
-        #   - connect -> portmap_connections, parameters, ignore_snippets?
-        #   - parent?, iob_parameters
-        return core_dict
-
-    @staticmethod
-    def create_from_text(core_text):
-        """
-        Function to create iob_core object from short notation text.
-
-        Attributes:
-            core_text (str): Short notation text. Object attributes are specified using the following format:
-                # Notation specific to modules
-                original_name
-
-                # Notation specific to cores
-                # TODO
-
-                # Below are parameters specific to the 'iob_csrs' module. They should probably not belong in the Py2HWSW code
-                [--no_autoaddr]
-                [--rw_overlap]
-                [--csr_if csr_if]
-                    [--csr-group csr_group_name]
-                        [-r reg_name:n_bits]
-                            [-t type] [-m mode] [--rst_val rst_val] [--addr addr] [--log2n_items log2n_items]
-
-        Returns:
-            iob_core: iob_core object
-        """
-        return __class__.create_from_dict(__class__.core_text2dict(core_text))
-
-    @staticmethod
-    def get_global_wires_list():
-        return iob_core.global_wires

@@ -11,11 +11,7 @@ from iob_base import (
     empty_list,
 )
 import iob_colors
-from iob_wire import iob_wire, iob_wire_reference
-from iob_bus import iob_bus
 from iob_port import iob_port
-
-get_real_wire = iob_wire.get_real_wire
 
 
 @dataclass
@@ -38,15 +34,6 @@ class iob_portmap:
     def __post_init__(self):
         if not self.port_name and self.port:
             self.port_name = self.port.wire.name
-
-    def validate_attributes(self):
-        if not self.port_name:
-            fail_with_msg("Port is not specified", ValueError)
-        if not self.e_connect:
-            fail_with_msg(f"Port '{self.port_name}' is not connected!", ValueError)
-
-        # TODO: validate if port and external buses really exist.
-        pass
 
     def connect_port(self, ports: list[iob_port]):
         """Connect the portmap to an iob_port object
@@ -80,9 +67,6 @@ class iob_portmap:
             if self.port.interface and bus.interface:
                 if type(self.port.interface) == type(bus.interface):
                     for wire in self.port.wires:
-                        # If it is a wire reference, get the real wire
-                        if isinstance(wire, iob_wire_reference):
-                            wire = get_real_wire(wire)
                         search_name = wire.name.replace(
                             self.port.interface.prefix, bus.interface.prefix, 1
                         )
@@ -96,11 +80,11 @@ class iob_portmap:
                             else:
                                 search_name = search_name[:-2]
 
-                        e_wire = find_obj_in_list(bus.wires, search_name, get_real_wire)
+                        e_wire = find_obj_in_list(bus.wires, search_name)
                         if not e_wire:
                             if not any(
                                 [
-                                    f"{get_real_wire(wire).name}:" in bit_slice
+                                    f"{wire.name}:" in bit_slice
                                     for bit_slice in bit_slices
                                 ]
                             ):
@@ -108,9 +92,9 @@ class iob_portmap:
                                 fail_with_msg(
                                     f"Port '{self.port.name}' wire '{wire.name}' not connected to external bus '{bus.name}'!\n"
                                     f"Port '{self.port.name}' has the following wires:\n"
-                                    f"{newlinechar.join('- ' + get_real_wire(wire).name for wire in self.port.wires)}\n"
+                                    f"{newlinechar.join('- ' + wire.name for wire in self.port.wires)}\n"
                                     f"External connection '{bus.name}' has the following wires:\n"
-                                    f"{newlinechar.join('- ' + get_real_wire(wire).name for wire in bus.wires)}\n",
+                                    f"{newlinechar.join('- ' + wire.name for wire in bus.wires)}\n",
                                     ValueError,
                                 )
                 elif len(self.port.wires) != len(bus.wires):
@@ -118,9 +102,9 @@ class iob_portmap:
                     fail_with_msg(
                         f"Port '{self.port.name}' has different number of wires compared to external connection '{bus.name}'!\n"
                         f"Port '{self.port.name}' has the following wires:\n"
-                        f"{newlinechar.join('- ' + get_real_wire(wire).name for wire in self.port.wires)}\n\n"
+                        f"{newlinechar.join('- ' + wire.name for wire in self.port.wires)}\n\n"
                         f"External connection '{bus.name}' has the following wires:\n"
-                        f"{newlinechar.join('- ' + get_real_wire(wire).name for wire in bus.wires)}\n",
+                        f"{newlinechar.join('- ' + wire.name for wire in bus.wires)}\n",
                         ValueError,
                     )
             elif len(self.port.wires) != len(bus.wires):
@@ -128,14 +112,13 @@ class iob_portmap:
                 fail_with_msg(
                     f"Port '{self.port.name}' has different number of wires compared to external connection '{bus.name}'!\n"
                     f"Port '{self.port.name}' has the following wires:\n"
-                    f"{newlinechar.join('- ' + get_real_wire(wire).name for wire in self.port.wires)}\n\n"
+                    f"{newlinechar.join('- ' + wire.name for wire in self.port.wires)}\n\n"
                     f"External connection '{bus.name}' has the following wires:\n"
-                    f"{newlinechar.join('- ' + get_real_wire(wire).name for wire in bus.wires)}",
+                    f"{newlinechar.join('- ' + wire.name for wire in bus.wires)}",
                     ValueError,
                 )
             else:
                 for p, w in zip(self.port.wires, bus.wires):
-                    w = get_real_wire(w)
                     if "'" in w.name or w.name.lower() == "z":
                         validate_verilog_const(value=w.name, direction=p.direction)
         else:
@@ -156,7 +139,7 @@ class iob_portmap:
         return port
 
     #
-    # Other Py2HWSW interface methods
+    # Other Py2HWSW portmap methods
     #
 
     @staticmethod
@@ -223,19 +206,3 @@ class iob_portmap:
             portmap_list.append(portmap)
 
         return portmap_list
-
-    @staticmethod
-    def create_from_text(portmap_text):
-        """
-        Function to create iob_portmap object from short notation text.
-
-        Attributes:
-            portmap_text (str): Short notation text. Object attributes are specified using the following format:
-                TODO
-
-        Returns:
-            iob_portmap: iob_portmap object
-        """
-        portmap_dict = {}
-        # TODO: parse short notation text
-        return iob_portmap(**portmap_dict)
