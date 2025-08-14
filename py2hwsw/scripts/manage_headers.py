@@ -88,6 +88,8 @@ independent_lic_extensions = [
     ".gz",
     ".ko",
     ".conf",
+    ".xls",
+    ".zip",
 ]
 
 # Strings used in multiline comments
