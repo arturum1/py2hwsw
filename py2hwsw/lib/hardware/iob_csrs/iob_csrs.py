@@ -126,7 +126,7 @@ def setup(py_params_dict):
         )
 
     # Append parameters for csr interface
-    if_gen_params = {}
+    interface_params = {}
     for param_name, param_value in csr_if_params.items():
         confs.append(
             {
@@ -140,7 +140,7 @@ def setup(py_params_dict):
         )
         # Remove csr_if suffix from parameter name (remove "AXI_" prefix)
         name_without_suffix = param_name[len(params["csr_if"]) + 1 :]
-        if_gen_params[name_without_suffix] = param_name
+        interface_params[name_without_suffix] = param_name
 
     attributes_dict = {
         "name": params["name"],
@@ -162,7 +162,7 @@ def setup(py_params_dict):
                     "type": params["csr_if"],
                     # ADDR_W set automatically
                     "DATA_W": "DATA_W",
-                    **if_gen_params,
+                    **interface_params,
                 },
                 "descr": "CSR control interface. Interface type defined by `csr_if` parameter.",
             },
@@ -230,10 +230,6 @@ def setup(py_params_dict):
         ],
         "subblocks": [
             {
-                "core_name": "iob_functions",
-                "instantiate": False,
-            },
-            {
                 "core_name": "iob_reg",
                 "instance_name": "iob_reg_inst",
                 "instantiate": False,
@@ -292,7 +288,23 @@ def setup(py_params_dict):
             {
                 "verilog_code": """
     // Include iob_functions for use in parameters
-    `include "iob_functions.vs"
+    localparam IOB_MAX_W = ADDR_W;
+    function [IOB_MAX_W-1:0] iob_max;
+       input [IOB_MAX_W-1:0] a;
+       input [IOB_MAX_W-1:0] b;
+       begin
+          if (a > b) iob_max = a;
+          else iob_max = b;
+       end
+    endfunction
+
+    function integer iob_abs;
+       input integer a;
+       begin
+          iob_abs = (a >= 0) ? a : -a;
+       end
+    endfunction
+
     `define IOB_NBYTES (DATA_W/8)
     `define IOB_NBYTES_W $clog2(`IOB_NBYTES)
     `define IOB_WORD_ADDR(ADDR) ((ADDR>>`IOB_NBYTES_W)<<`IOB_NBYTES_W)\n

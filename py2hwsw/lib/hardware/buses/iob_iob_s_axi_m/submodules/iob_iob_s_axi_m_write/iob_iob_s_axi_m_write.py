@@ -54,13 +54,9 @@ def setup(py_params_dict):
                 "name": "clk_en_rst_s",
                 "signals": {
                     "type": "iob_clk",
+                    "params": "c_a_r",
                 },
                 "descr": "Clock, clock enable and reset",
-            },
-            {
-                "name": "rst_i",
-                "descr": "Reset signal",
-                "signals": [{"name": "rst_i"}],
             },
             {
                 "name": "start_addr_i",
@@ -122,22 +118,29 @@ def setup(py_params_dict):
         ],
         "wires": [
             {
-                "name": "fifo_w_if",
-                "descr": "FIFO write interface",
-                "signals": [
-                    {"name": "fifo_wen", "isvar": True},
-                    {"name": "write_data_i", "width": "AXI_DATA_W"},
-                    {"name": "fifo_w_full"},
-                ],
+                "name": "fifo_wen",
+                "descr": "Write enable for the FIFO",
+                "signals": [{"name": "fifo_wen", "isvar": True}],
             },
             {
-                "name": "fifo_r_if",
-                "descr": "FIFO read interface",
-                "signals": [
-                    {"name": "fifo_ren"},
-                    {"name": "fifo_r_data", "width": "AXI_DATA_W"},
-                    {"name": "fifo_r_empty"},
-                ],
+                "name": "fifo_w_full",
+                "descr": "FIFO write full signal",
+                "signals": [{"name": "fifo_w_full"}],
+            },
+            {
+                "name": "fifo_ren",
+                "descr": "Read enable for the FIFO",
+                "signals": [{"name": "fifo_ren"}],
+            },
+            {
+                "name": "fifo_rdata",
+                "descr": "FIFO read data",
+                "signals": [{"name": "fifo_rdata", "width": "AXI_DATA_W"}],
+            },
+            {
+                "name": "fifo_r_empty",
+                "descr": "FIFO read empty signal",
+                "signals": [{"name": "fifo_r_empty"}],
             },
             {
                 "name": "en_fifo2axis",
@@ -187,11 +190,14 @@ def setup(py_params_dict):
                 },
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
-                    "rst_i": "rst_i",
-                    "write_io": "fifo_w_if",
-                    "read_io": "fifo_r_if",
+                    "w_en_i": "fifo_wen",
+                    "w_data_i": "write_data_i",
+                    "w_full_o": "fifo_w_full",
+                    "r_en_i": "fifo_ren",
+                    "r_data_o": "fifo_rdata",
+                    "r_empty_o": "fifo_r_empty",
+                    "level_o": "level_o",
                     "extmem_io": "write_fifo_external_mem_bus_m",
-                    "fifo_o": "level_o",
                 },
             },
             {
@@ -205,7 +211,9 @@ def setup(py_params_dict):
                 "connect": {
                     "clk_en_rst_s": "fifo2axis_clk_if",
                     "en_i": "en_fifo2axis",
-                    "fifo_r_io": "fifo_r_if",
+                    "fifo_read_o": "fifo_ren",
+                    "fifo_rdata_i": "fifo_rdata",
+                    "fifo_empty_i": "fifo_r_empty",
                     "axis_m": "internal_axis_signals",
                 },
             },

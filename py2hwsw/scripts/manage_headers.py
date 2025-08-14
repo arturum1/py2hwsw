@@ -42,6 +42,7 @@ comment_char = {
     ".sh": "#",
     ".mk": "#",
     "Makefile": "#",
+    ".Microsoft_nmake": "#",
     ".nix": "#",
     ".tex": "%",
     ".cls": "%",
@@ -61,7 +62,9 @@ comment_char = {
     ".ccf": "#",
     ".service": "#",
     "Dockerfile": "#",
+    "Doxyfile": "#",
     ".xml": "<!--",
+    ".rsp": "#",
 }
 
 # File extensions with independent license headers
@@ -82,6 +85,9 @@ independent_lic_extensions = [
     ".lib",
     ".rules",
     ".tmp",
+    ".gz",
+    ".ko",
+    ".conf",
 ]
 
 # Strings used in multiline comments
@@ -105,6 +111,16 @@ headers = {
 {{ spdx_prefix }}-License-Identifier: {{ expression }}
 {% endfor %}
 {%- if custom_header_suffix %}
+{{ custom_header_suffix }}
+{% endif %}
+""",
+    "commercial": """\
+------------------------------------------------------------------------
+Copyright (c) 2018-{{ copyright_year }} {{ copyright_holder }}.
+                                                                     
+Please review the terms of the license agreement before using this file.
+{%- if custom_header_suffix %}
+
 {{ custom_header_suffix }}
 {% endif %}
 """,
@@ -251,6 +267,10 @@ def generate_headers(
         print("\n".join(files))
         return
 
+    # Override header template for commercial license
+    if license_name.lower() == "commercial":
+        header_template = "commercial"
+
     template_context = {
         "copyright_lines": [
             f"SPDX-FileCopyrightText: {copyright_year} {copyright_holder}",
@@ -258,6 +278,8 @@ def generate_headers(
         "contributor_lines": [],
         "spdx_expressions": [license_name],
         "custom_header_suffix": custom_header_suffix,
+        "copyright_holder": copyright_holder,
+        "copyright_year": copyright_year,
         # Note: spdx_prefix is only needed because otherwise the `reuse` tool has a bug that would miss identify the template line as legitimate SPDX header for this file.
         "spdx_prefix": "SPDX",
     }
@@ -279,8 +301,10 @@ def generate_headers(
     files = find_files_with_extensions(
         root,
         independent_lic_extensions,
+        ignore_extensions=comment_char.keys(),
         ignore_paths=ignore_paths,
         ignore_files=ignore_files,
+        include_files_without_extension=True,
     )
 
     for file in files:
@@ -430,12 +454,23 @@ def modify_file_header(
         raise (e)
 
 
-def find_files_with_extensions(directory, extensions, ignore_paths=[], ignore_files=[]):
+def find_files_with_extensions(
+    directory,
+    extensions,
+    ignore_extensions=[],
+    ignore_paths=[],
+    ignore_files=[],
+    include_files_without_extension=False,
+):
     """
     Search for files with specified extensions in a directory recursively.
 
     :param directory: The root directory to start the search.
     :param extensions: A list of file extensions to search for.
+    :param ignore_extensions: A list of file extensions to skip
+    :param ignore_paths: A list of paths to ignore.
+    :param ignore_files: A list of files to ignore.
+    :param include_files_without_extension: Whether to include files without extension.
     :return: A list of file paths that match the specified extensions.
     """
     matching_files = []
@@ -449,13 +484,23 @@ def find_files_with_extensions(directory, extensions, ignore_paths=[], ignore_fi
                 print(f"Ignoring path {root}")
             continue
         for file in files:
+            # Ignore files named 'LICENSE'
+            if file == "LICENSE":
+                continue
             # Ignore specified files
             if root + "/" + file in ignore_files:
                 if VERBOSE:
                     print(f"Ignoring file {root + '/' + file}")
                 continue
+            # Skip files with ignore_extensions
+            if any(file.endswith(ext) for ext in ignore_extensions):
+                continue
             # Check if the file has one of the specified extensions
             if any(file.endswith(ext) for ext in extensions):
+                # Construct the full file path and add it to the list
+                matching_files.append(os.path.join(root, file))
+            # Check if the file has no extension
+            if include_files_without_extension and "." not in file:
                 # Construct the full file path and add it to the list
                 matching_files.append(os.path.join(root, file))
 

@@ -72,11 +72,6 @@ def generate_subblocks(core):
     for instance in core.subblocks:
         if not instance.instantiate:
             continue
-        # Open ifdef if conditional interface
-        if instance.if_defined:
-            code += f"`ifdef {instance.if_defined}\n"
-        if instance.if_not_defined:
-            code += f"`ifndef {instance.if_not_defined}\n"
 
         params_str = ""
         if instance.parameters:
@@ -91,9 +86,6 @@ def generate_subblocks(core):
         );
 
     """
-        # Close ifdef if conditional interface
-        if instance.if_defined or instance.if_not_defined:
-            code += "`endif\n"
 
     return code
 
@@ -127,7 +119,9 @@ def get_instance_port_connections(instance):
         ), f"{iob_colors.FAIL}Port '{port.name}' of instance '{instance.name}' is not connected!{iob_colors.ENDC}"
 
         # If one of the ports is not a standard inferface, check if the number of signals is the same
-        if not port.interface or not portmap.e_connect.interface:
+        if (not port.interface or not portmap.e_connect.interface) and not isinstance(
+            portmap.e_connect, str
+        ):
             newlinechar = "\n"
             assert len(port.signals) == len(
                 portmap.e_connect.signals
@@ -208,7 +202,11 @@ External connection '{get_real_signal(portmap.e_connect).name}' has the followin
                         e_signal_name = bit_slice
                     break
 
-            instance_portmap += f"        .{port_name}({e_signal_name}),\n"
+            if e_signal_name.lower() == "z":
+                # If the external signal is 'z', do not connect it
+                instance_portmap += f"        .{port_name}(),\n"
+            else:
+                instance_portmap += f"        .{port_name}({e_signal_name}),\n"
 
     instance_portmap = instance_portmap[:-2] + "\n"  # Remove last comma
 

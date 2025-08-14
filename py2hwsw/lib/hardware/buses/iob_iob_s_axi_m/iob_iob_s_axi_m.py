@@ -64,13 +64,9 @@ def setup(py_params_dict):
             "name": "clk_en_rst_s",
             "signals": {
                 "type": "iob_clk",
+                "params": "c_a_r",
             },
             "descr": "Clock, clock enable and reset",
-        },
-        {
-            "name": "rst_i",
-            "descr": "Reset signal",
-            "signals": [{"name": "rst_i", "descr": "Reset signal"}],
         },
         {
             "name": "iob_s",
@@ -218,9 +214,9 @@ def setup(py_params_dict):
             "name": "read_data_axis",
             "descr": "Read data AXI-Stream signals",
             "signals": [
+                {"name": "iob_rdata_o", "width": "DATA_W"},
                 {"name": "iob_rvalid_o"},
                 {"name": "read_data_ready"},
-                {"name": "iob_rdata_o", "width": "DATA_W"},
             ],
         },
         {
@@ -303,7 +299,6 @@ def setup(py_params_dict):
             },
             "connect": {
                 "clk_en_rst_s": "clk_en_rst_s",
-                "rst_i": "rst_i",
                 "start_addr_i": "start_addr",
                 "length_i": "length",
                 "write_data_i": "write_data",
@@ -325,7 +320,6 @@ def setup(py_params_dict):
             },
             "connect": {
                 "clk_en_rst_s": "clk_en_rst_s",
-                "rst_i": "rst_i",
                 "start_addr_i": "start_addr",
                 "length_i": "length",
                 "start_transfer_i": "start_read_transfer",

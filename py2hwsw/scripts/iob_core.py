@@ -13,7 +13,7 @@ import pathlib
 
 import iob_colors
 
-import copy_srcs
+import setup_srcs
 
 import config_gen
 import param_gen
@@ -29,7 +29,7 @@ import ipxact_gen
 
 from py2hwsw_version import PY2HWSW_VERSION
 from iob_python_parameter import create_python_parameter_group
-from if_gen import mem_if_names
+import interfaces
 from iob_module import iob_module, get_list_attr_handler
 from iob_instance import iob_instance
 from iob_base import (
@@ -40,6 +40,7 @@ from iob_base import (
     add_traceback_msg,
     debug,
     get_lib_cores,
+    find_folder_by_name
 )
 from iob_license import iob_license, update_license
 import sw_tools
@@ -98,6 +99,9 @@ class iob_core(iob_module, iob_instance):
         # Store kwargs to allow access to python parameters after object has been created
         self.received_python_parameters = kwargs
 
+        # Reference to parent core
+        self.parent_obj = None
+
         # Create core based on 'parent' core (if applicable)
         if self.handle_parent(*args, **kwargs):
             return
@@ -130,12 +134,6 @@ class iob_core(iob_module, iob_instance):
             "",
             str,
             descr="Path to folder of build directory to be generated for this project.",
-        )
-        self.set_default_attribute(
-            "instance_name",
-            "",
-            str,
-            descr="Name of an instance of this class.",
         )
         self.set_default_attribute(
             "use_netlist",
@@ -265,11 +263,21 @@ class iob_core(iob_module, iob_instance):
 
         # Create memory wrapper for top module if any memory interfaces are used
         if self.is_top_module or self.is_tester:
-            if any(
-                (port.interface.type in mem_if_names and port.name.endswith("m"))
-                for port in self.ports
-                if port.interface
-            ):
+            # Check if any memory interfaces are used and are a master
+            found_mem_if = False
+            for port in self.ports:
+                if (
+                    port.interface
+                    and isinstance(
+                        port.interface,
+                        (interfaces.asymMemInterface, interfaces.symMemInterface),
+                    )
+                    and port.name.endswith("m")
+                ):
+                    found_mem_if = True
+                    break
+
+            if found_mem_if:
                 superblocks = self.__create_memwrapper(superblocks=superblocks)
 
         # Add 'VERSION' macro
@@ -303,7 +311,7 @@ class iob_core(iob_module, iob_instance):
             return
 
     def post_setup(self):
-        """Scripts to run at the end of the top module's setup"""
+        """Scripts to run at the end of the top module's build dir generation."""
         # Replace Verilog snippet includes
         self._replace_snippet_includes()
         # Clean duplicate sources in `hardware/src` and its subfolders (like `hardware/simulation/src`)
@@ -312,13 +320,11 @@ class iob_core(iob_module, iob_instance):
             # Add callback to: Remove duplicate sources from tester dirs, that already exist in UUT's `hardware/src` folder
             __class__.global_post_setup_callbacks.append(
                 lambda: self._remove_duplicate_sources(
-                    main_folder=os.path.join(self.relative_path_to_UUT, "hardware/src"),
-                    subfolders=[
-                        "hardware/src",
-                        "hardware/simulation/src",
-                        "hardware/fpga/src",
-                        "hardware/common_src",
-                    ],
+                    subfolders={
+                        os.path.join(self.relative_path_to_UUT, "hardware/src"): ["hardware/src"],
+                        "hardware/src": ["hardware/common_src", "hardware/simulation/src", "hardware/fpga/src"],
+                        "hardware/fpga/src": [], # Empty list will cause it to be auto-filled based on boards_list
+                    },
                 )
             )
         else:  # Not tester
@@ -338,8 +344,8 @@ class iob_core(iob_module, iob_instance):
         print(
             f"{iob_colors.INFO}Setup of '{self.original_name}' core successful. Generated build directory: '{self.build_dir}'.{iob_colors.ENDC}"
         )
-        # Add SPDX license headers to every file in build dir
-        custom_header=f"Py2HWSW Version {PY2HWSW_VERSION} has generated this code (https://github.com/IObundle/py2hwsw)."
+        # Add license headers to every file in build dir
+        custom_header = f"Py2HWSW Version {PY2HWSW_VERSION} has generated this code (https://github.com/IObundle/py2hwsw)."
         generate_headers(
             root=self.build_dir,
             copyright_holder=self.license.author,
@@ -408,27 +414,30 @@ class iob_core(iob_module, iob_instance):
             parameters=kwargs.get("parameters", {}),
             is_superblock=kwargs.get("is_superblock", False),
         )
-
+        is_parent_backup = self.is_parent
         # Copy (some) parent attributes to child
-        self.__dict__.update(parent_module.__dict__)
+        parent_module_dict = copy.deepcopy(parent_module.__dict__)
+        self.__dict__.update(parent_module_dict)
         self.original_name = attributes["original_name"]
         self.setup_dir = attributes["setup_dir"]
+        self.is_parent = is_parent_backup
 
-        if self.abort_reason:
-            return True
+        # Store reference to parent core
+        self.parent_obj = parent_module
 
-        # Copy files from the module's setup dir
-        copy_srcs.copy_rename_setup_directory(self)
-
-        # Run post setup
-        if is_first_module_called:
-            self.post_setup()
 
         return True
 
+    def copy_files_current_and_parent_setup_dir(self):
+        """Copy files from parent setup dir recursively (if any), and the current core's setup dir"""
+        if self.parent_obj:
+            self.parent_obj.copy_files_current_and_parent_setup_dir()
+        setup_srcs.copy_rename_setup_directory(self)
+
     def generate_build_dir(self, **kwargs):
 
-        self.__create_build_dir()
+        if self.is_top_module or self.is_tester:
+            self.__create_build_dir()
 
         # subblock setup process
         for subblock in self.subblocks:
@@ -451,10 +460,10 @@ class iob_core(iob_module, iob_instance):
         # Copy files from LIB to setup various flows
         # (should run before copy of files from module's setup dir)
         if self.is_top_module or self.is_tester:
-            copy_srcs.flows_setup(self)
+            setup_srcs.flows_setup(self)
 
-        # Copy files from the module's setup dir
-        copy_srcs.copy_rename_setup_directory(self)
+        # Copy files from the module's setup dir and its parents
+        self.copy_files_current_and_parent_setup_dir()
 
         # Generate config_build.mk
         if self.is_top_module or self.is_tester:
@@ -499,7 +508,7 @@ class iob_core(iob_module, iob_instance):
         # TODO as well: Each module has a local `snippets` list.
         # Note: The 'width' attribute of many module's signals are generaly not needed, because most of them will be connected to global wires (that already contain the width).
 
-        if (self.is_top_module and not self.is_parent) or self.is_tester:
+        if self.is_top_module or self.is_tester:
             self.post_setup()
 
     @staticmethod
@@ -576,16 +585,10 @@ class iob_core(iob_module, iob_instance):
             for portmap in subblock.portmap_connections:
                 if (
                     portmap.port.name == "iob_csrs_cbus_s"
-                    and portmap.port.interface.type == "iob"
+                    and isinstance(portmap.port.interface, interfaces.iobInterface)
                     and portmap.e_connect
                 ):
-                    # print(
-                    #     "DEBUG",
-                    #     self.name,
-                    #     port,
-                    #     file=sys.stderr,
-                    # )
-                    port_width = portmap.port.interface.widths["ADDR_W"]
+                    port_width = portmap.port.interface.addr_w
                     external_wire_prefix = portmap.e_connect.interface.prefix
                     portmap.e_connect_bit_slices = [
                         f"{external_wire_prefix}iob_addr[{port_width}-1:0]"
@@ -597,7 +600,7 @@ class iob_core(iob_module, iob_instance):
             {
                 "core_name": "iob_memwrapper",
                 "instance_name": f"{self.name}_memwrapper",
-                "mem_if_names": mem_if_names,
+                "mem_if_names": interfaces.mem_if_names,
                 "superblocks": superblocks,
             },
         ]
@@ -612,21 +615,44 @@ class iob_core(iob_module, iob_instance):
         os.makedirs(f"{self.build_dir}/document/tsrc", exist_ok=True)
 
         shutil.copyfile(
-            f"{copy_srcs.get_lib_dir()}/build.mk", f"{self.build_dir}/Makefile"
+            f"{setup_srcs.get_lib_dir()}/build.mk", f"{self.build_dir}/Makefile"
         )
         nix_permission_hack(f"{self.build_dir}/Makefile")
 
-    def _remove_duplicate_sources(self, main_folder="hardware/src", subfolders=None):
-        """Remove sources in the build directory from subfolders that exist in `hardware/src`"""
+    def _remove_duplicate_sources(self, subfolders: dict = {}):
+        """Remove duplicate sources in the build directory from subfolders.
+        Args:
+            subfolders (dict): Each key is a folder, each value is a list of subfolders to check for duplicates sources and remove them.
+                               Example: {
+                                 "hardware/src": ["hardware/simulation/src", "hardware/fpga/src"],
+                                 "hardware/fpga/src": ["hardware/fpga/vivado/basys3"],
+                               }
+                               Sources of 'hardware/src' will be removed from 'hardware/simulation/src', 'hardware/fpga/src', and 'hardware/fpga/vivado/basys3' if they are duplicate.
+                               Sources of 'hardware/fpga/src' will be removed from 'hardware/fpga/vivado/basys3' if they are duplicate.
+        """
+        # Default value
         if not subfolders:
-            subfolders = [
-                "hardware/simulation/src",
-                "hardware/fpga/src",
-                "hardware/common_src",
-            ]
+            subfolders = {
+                "hardware/src": ["hardware/common_src", "hardware/simulation/src", "hardware/fpga/src"],
+                "hardware/fpga/src": [],
+            }
 
-        # Go through all subfolders that may contain duplicate sources
-        for subfolder in subfolders:
+        # Auto-append board folders from the boards_list to the 'subfolders' dict
+        # but only if the 'hardware/fpga/src' key is present and is empty
+        if "hardware/fpga/src" in subfolders and not subfolders["hardware/fpga/src"]:
+            # Find board directories in build_dir
+            build_dir_fpga = os.path.join(self.build_dir, "hardware/fpga")
+            for board in self.board_list:
+                board_folder = find_folder_by_name(build_dir_fpga, board)
+                if not board_folder:
+                    fail_with_msg(f"Board folder '{board}' not found inside '{build_dir_fpga}'.", ValueError)
+                # Get only the relative path
+                board_folder = os.path.relpath(board_folder, start=self.build_dir)
+                subfolders["hardware/fpga/src"].append(board_folder)
+
+        def remove_common_sources(main_folder, subfolder):
+            """Remove common sources between main_folder and subfolder"""
+            # print(f"DEBUG: Searching duplicates between '{main_folder}' and '{subfolder}'")
             # Get common srcs between main_folder and current subfolder
             common_srcs = find_common_deep(
                 os.path.join(self.build_dir, main_folder),
@@ -636,6 +662,19 @@ class iob_core(iob_module, iob_instance):
             for src in common_srcs:
                 os.remove(os.path.join(self.build_dir, subfolder, src))
                 # print(f'{iob_colors.INFO}Removed duplicate source: {os.path.join(subfolder, src)}{iob_colors.ENDC}')
+
+        def remove_common_sources_in_subfolders(main_folder, direct_subfolders):
+            """Given a single main_folder, remove common sources with all subfolders below it, recursively"""
+            for direct_subfolder in direct_subfolders:
+                remove_common_sources(main_folder, direct_subfolder)
+                # Also remove recursively from sub-subfolders
+                if direct_subfolder in subfolders:
+                    remove_common_sources_in_subfolders(main_folder, subfolders[direct_subfolder])
+
+        # Go through all folders as if they are main folders (order does not matter)
+        for folder, direct_subfolders in subfolders.items():
+            remove_common_sources_in_subfolders(folder, direct_subfolders)
+
 
     def _replace_snippet_includes(self):
         verilog_gen.replace_includes(
@@ -663,7 +702,7 @@ class iob_core(iob_module, iob_instance):
         # Find Verilog sources and headers from build dir
         verilog_headers = []
         verilog_sources = []
-        for path in Path(os.path.join(self.build_dir, "hardware")).rglob("*.vh"):
+        for path in Path(os.path.join(self.build_dir, "hardware/src")).rglob("*.vh"):
             # Skip specific Verilog headers
             if "test_" in path.name:
                 continue
@@ -672,7 +711,7 @@ class iob_core(iob_module, iob_instance):
                 continue
             verilog_headers.append(str(path))
             # print(str(path))
-        for path in Path(os.path.join(self.build_dir, "hardware")).rglob("*.v"):
+        for path in Path(os.path.join(self.build_dir, "hardware/src")).rglob("*.v"):
             # Skip synthesis directory # TODO: Support this?
             if "/syn/" in str(path):
                 continue
@@ -682,7 +721,12 @@ class iob_core(iob_module, iob_instance):
         # Run Verilog linter
         # FIXME: Don't run for tester since iob_system is still full of warnings (and we may not even need to lint tester files?)
         if __class__.global_project_vlint and not self.is_tester:
-            verilog_lint.lint_files(verilog_headers + verilog_sources)
+            lint_cfg_path = Path(os.path.join(self.build_dir, "hardware/lint"))
+            verilog_lint.lint_files(
+                verilog_headers + verilog_sources,
+                extra_flags=f"--top-module {self.name}",
+                config_path=lint_cfg_path,
+            )
 
         # Run Verilog formatter
         if __class__.global_project_vformat:
@@ -851,9 +895,7 @@ class iob_core(iob_module, iob_instance):
                     # "core_name": core_name,
                     "build_dir": __class__.global_build_dir,
                     "py2hwsw_target": __class__.global_special_target or "setup",
-                    "issuer": (
-                        issuer.attributes_dict if issuer else ""
-                    ),
+                    "issuer": (issuer.attributes_dict if issuer else ""),
                     "py2hwsw_version": PY2HWSW_VERSION,
                     **kwargs,
                 }
@@ -890,8 +932,8 @@ class iob_core(iob_module, iob_instance):
             setup_dir=os.path.join(os.path.dirname(__file__), "../py2hwsw_document"),
             build_dir="py2hwsw_generated_docs",
         )
-        copy_srcs.doc_setup(core)
-        copy_srcs.copy_rename_setup_subdir(core, "document")
+        setup_srcs.doc_setup(core)
+        setup_srcs.copy_rename_setup_subdir(core, "document")
         with open(f"{core.build_dir}/config_build.mk", "w") as f:
             f.write("NAME=Py2HWSW\n")
         with open(f"{core.build_dir}/document/tsrc/{core.name}_version.tex", "w") as f:
