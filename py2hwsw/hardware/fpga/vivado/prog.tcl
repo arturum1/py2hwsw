@@ -35,26 +35,28 @@ if { [catch {open_hw_target} result] } {
 
 # Program and refresh the device
 
+set HW_DEVICE [lindex [get_hw_devices] $DEVICE_ID]
+
 # Identify the AMD FPGA on the open hardware target
-if { [catch {current_hw_device [lindex [get_hw_devices] $DEVICE_ID]} result] } {
+if { [catch {current_hw_device $HW_DEVICE} result] } {
    puts "ERROR: Can't identify hardware device.\n"
    exit result
 }
-refresh_hw_device -update_hw_probes false [lindex [get_hw_devices]  $DEVICE_ID]
+refresh_hw_device -update_hw_probes false $HW_DEVICE]
 # Associate the bitstream data programming file with the appropriate FPGA device
-if { [catch {set_property PROGRAM.FILE "./$NAME.bit" [lindex [get_hw_devices] $DEVICE_ID]} result] } {
+if { [catch {set_property PROGRAM.FILE "./$NAME.bit" $HW_DEVICE} result] } {
    puts "ERROR: Can't associate bitstream to FPGA.\n"
    exit result
 }
-#set_property PROBES.FILE {C:/design.ltx} [lindex [get_hw_devices] $DEVICE_ID]
+#set_property PROBES.FILE {C:/design.ltx} $HW_DEVICE
 
 # Program or download the programming file into the hardware device
-if { [catch {program_hw_devices [lindex [get_hw_devices] $DEVICE_ID]} result] } {
+if { [catch {program_hw_devices $HW_DEVICE} result] } {
    puts "ERROR: Can't program FPGA.\n"
    exit result
 }
 # Refresh the hardware device to update the hardware probes
-if { [catch {refresh_hw_device [lindex [get_hw_devices] $DEVICE_ID]} result] } {
+if { [catch {refresh_hw_device $HW_DEVICE} result] } {
    puts "ERROR: Can't refresh hardware device.\n"
    exit result
 }
