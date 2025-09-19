@@ -96,6 +96,7 @@ def append_board_wrappers(attributes_dict, params):
         "iob_cyclonev_gt_dk": "quartus",
         "iob_zybo_z7": "vivado",
         "iob_basys3": "vivado",
+        "iob_smart_zynq_sl": "vivado",
     }
     for board in attributes_dict.get("board_list", []):
         tool = tools[board]

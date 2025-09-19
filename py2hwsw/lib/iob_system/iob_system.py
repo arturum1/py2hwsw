@@ -77,7 +77,12 @@ def setup(py_params_dict):
         "name": params["name"],
         "generate_hw": True,
         "is_system": True,
-        "board_list": ["iob_aes_ku040_db_g", "iob_zybo_z7", "iob_cyclonev_gt_dk"],
+        "board_list": [
+            "iob_aes_ku040_db_g",
+            "iob_zybo_z7",
+            "iob_cyclonev_gt_dk",
+            "iob_smart_zynq_sl",
+        ],
         "python_parameters": python_parameters_attribute,
         "title": "IOb-System",
         "description": "System-on-Chip (SoC) template",
