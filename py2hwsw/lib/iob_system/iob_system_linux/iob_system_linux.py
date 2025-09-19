@@ -11,9 +11,6 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../scr
 
 from iob_system_utils import update_params
 
-# TODO: use the following to interact with linux
-# CONSOLE_CMD ?=$(PYTHON_DIR)/console.py -s $(BOARD_SERIAL_PORT); screen $(BOARD_SERIAL_PORT) 115200
-
 
 def setup(py_params_dict):
     params = {
@@ -22,8 +19,9 @@ def setup(py_params_dict):
     iob_system_default_params = {
         "use_intmem": False,
         "use_extmem": True,
+        "use_ethernet": True,
         "mem_addr_w": 26,
-        "bootrom_addr_w": 15,
+        "bootrom_addr_w": 16,
         "fw_baseaddr": 0,
     }
     iob_system_default_params |= {
@@ -68,7 +66,10 @@ def setup(py_params_dict):
     #         shutil.copy2(src_file, dst)
     #
     # # Copy scripts to build directory
-    if py_params_dict["build_dir"]:
+    if (
+        py_params_dict.get("py2hwsw_target", "") == "setup"
+        and py_params_dict["build_dir"]
+    ):
         for src_file in [
             "scripts/check_if_run_linux.py",
         ]:
@@ -78,6 +79,16 @@ def setup(py_params_dict):
             shutil.copy2(src, dst)
             # Hack for Nix: Files copied from Nix's py2hwsw package do not contain write permissions
             os.system("chmod -R ug+w " + dst)
+
+        # Create symlink for minicom's .minirc.iobundle.dfl
+        # Note: Minicom only accepts configuration files starting with ".minirc", and python's setuptools does not copy dotfiles by default.
+        #       So, as a workaround, we named the file 'minirc.iobundle.dfl' in the repo, and create a symlink to it during setup.
+        fpga_dir = os.path.join(py_params_dict["build_dir"], "hardware/fpga")
+        os.makedirs(fpga_dir, exist_ok=True)
+        minirc_path = os.path.join(fpga_dir, ".minirc.iobundle.dfl")
+        if not os.path.exists(minirc_path):
+            os.symlink("minirc.iobundle.dfl", minirc_path)
+
     #     iob_soc_scripts = [
     #         "terminalMode",
     #         "makehex",
@@ -116,16 +127,6 @@ def setup(py_params_dict):
     #         f"{cls.build_dir}/hardware/src",
     #         dirs_exist_ok=True,
     #     )
-    #
-    #     # Override periphs_tmp.h of iob-soc with one specific for linux
-    #     create_periphs_tmp(
-    #         cls.name,
-    #         next(i["val"] for i in cls.confs if i["name"] == "ADDR_W"),
-    #         cls.peripherals,
-    #         f"{cls.build_dir}/software/{cls.name}_periphs.h",
-    #     )
-    #     check_linux_build_macros(cls, f"{setup_dir}/submodules/OS")
-    #
 
     #
     # Versat
@@ -246,32 +247,6 @@ def setup(py_params_dict):
                             "interrupt_o": "uart_interrupt",
                         },
                     },
-                    # {
-                    #     "core_name": "iob_eth",
-                    #     "instance_name": "ETH0",
-                    #     "instance_description": "Ethernet interface",
-                    #     "peripheral_addr_w": 12,
-                    #     "parameters": {
-                    #         "AXI_ID_W": "AXI_ID_W",
-                    #         "AXI_LEN_W": "AXI_LEN_W",
-                    #         "AXI_ADDR_W": params["addr_w"],
-                    #         "AXI_DATA_W": params["data_w"],
-                    #     },
-                    #     "connect": {
-                    #         "clk_en_rst_s": "clk_en_rst_s",
-                    #         "axi_m": (
-                    #             "eth_axi",
-                    #             [
-                    #                 "eth_axi_arid[0]",
-                    #                 "eth_axi_rid[0]",
-                    #                 "eth_axi_awid[0]",
-                    #                 "eth_axi_bid[0]",
-                    #             ],
-                    #         ),
-                    #         "inta_o": "ethernet_interrupt",
-                    #         "phy_io": "phy_io",
-                    #     },
-                    # },
                     # {
                     #     # Instantiate a VERSAT core from: https://github.com/IObundle/iob-versat
                     #     "core_name": "iob_versat",
