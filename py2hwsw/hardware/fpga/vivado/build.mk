@@ -27,7 +27,7 @@ export RDI_VERBOSE = False
 
 VIVADO_FLAGS= -nojournal -log reports/vivado.log -mode batch -source vivado/build.tcl -tclargs $(NAME) $(FPGA_TOP) $(CSR_IF) $(BOARD) "$(VSRC)" " $(INCLUDE_DIRS)" $(IS_FPGA) $(USE_EXTMEM) $(USE_ETHERNET)
 
-VITIS_FLAGS= --source vitis_build.py $(NAME)
+VITIS_FLAGS= --source vivado/vitis_build.py $(NAME)
 
 $(FPGA_OBJ): $(VSRC) $(VHDR) $(wildcard $(BOARD)/*.sdc)
 	mkdir -p reports && vivado $(VIVADO_FLAGS) 

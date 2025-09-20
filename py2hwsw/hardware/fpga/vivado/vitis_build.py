@@ -19,11 +19,11 @@ client.set_workspace(path="./vitis_ws")
 # Specify the target CPU (PS7 Cortex-A53) and the operating system environment (standalone for FSBL).
 # The platform is created inside a named domain (logical grouping of embedded projects).
 platform_comp = client.create_platform_component(
-    name='platform',
-    hw_design='hw_platform.xsa',
-    cpu='psu_cortexa53_0',
-    os='standalone',
-    domain_name='standalone_domain'
+    name="platform",
+    hw_design="hw_platform.xsa",
+    cpu="ps7_cortexa9_0",
+    os="standalone",
+    domain_name="standalone_domain",
 )
 
 # Build the platform component. This prepares the platform and generates necessary BSPs and platform files.
@@ -35,9 +35,9 @@ platform_comp.build()
 # Use the 'fsbl' template to create the First Stage Boot Loader application.
 app_comp = client.create_app_component(
     name=name,
-    platform='./vitis_ws/export/platform/platform.xpfm',
-    domain='standalone_domain',
-    template='fsbl'
+    platform="./vitis_ws/export/platform/platform.xpfm",
+    domain="standalone_domain",
+    template="fsbl",
 )
 
 # Build the FSBL application, compiling it into an executable ELF that can run on your processor.

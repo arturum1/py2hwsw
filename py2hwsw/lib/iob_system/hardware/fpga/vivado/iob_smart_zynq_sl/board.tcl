@@ -21,18 +21,32 @@ if { ![file isdirectory $ip_dir]} {
 # Xilinx Processing System 7 IP
 #
 
-# Create PS7 IP core (Xilinx Processing System 7)
+puts "Creating minimal block design project to generate ZYNQ Processing System 7"
+
+# Create new project in subdirectory
+create_project zynq_minimal_proj ./zynq_minimal_proj -force
+
+# Create the block design
+create_bd_design zynq_design
+
+# Add ZYNQ7 Processing System IP
 # Product Guide: https://docs.amd.com/v/u/en-US/pg082-processing-system7
-create_ip -name processing_system7 -vendor xilinx.com -library ip -version 5.5 -module_name processing_system7_0 -dir $ip_dir -force
+create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7:5.5 processing_system7_0
+
+# Run block automation to configure PS7 for board, clocks, IOs, AXI etc
+#apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 -config {make_bclk_clks true} $ps7_inst
+
+# Optional: You can set some PS7 configuration properties here if needed
+# set_property CONFIG.C_USE_AXI_HP0 1 [get_bd_cells processing_system7_0]
 
 # NOTE: Configure PS7 IP core here
+# - Disable M_AXI_GP0 (General purpose manager AXI bus)
 # - Enable FCLK0 (system clock)
 # - Configure FCLK0 frequency
 # - Enable FCLK_RESET0_N (system reset)
-# - Disable M_AXI_GP0 (General purpose manager AXI bus)
 set_property -dict [list \
     CONFIG.PCW_USE_M_AXI_GP0 {0} \
-] [get_ips processing_system7_0]
+] [get_bd_cells processing_system7_0]
 
 if { $USE_EXTMEM > 0 } {
     # Enable HP0 AXI slave interface for DDR (runs at FCLK0 frequency)
@@ -44,13 +58,42 @@ if { $USE_EXTMEM > 0 } {
     # etc.
 }
 
-# Print the PS7 configuration
-report_property [get_ips processing_system7_0]
+# Validate design
+validate_bd_design
 
-# Generate the output products for the PS7 IP
-generate_target all [get_ips processing_system7_0]
+# Generate output products (necessary for synthesis)
+generate_target all [get_bd_designs zynq_design.bd]
 
-puts "Created and configured PS7 IP at $ip_dir/processing_system7_0"
+# Save the design
+save_bd_design
+
+# Create HDL wrapper for BD and set as top
+make_wrapper -files [get_files zynq_design.bd] -top
+
+# Add the wrapper HDL file explicitly to the project
+add_files -norecurse ./zynq_minimal_proj/zynq_minimal_proj.gen/sources_1/bd/zynq_design/hdl/zynq_design_wrapper.v
+
+# Set top module to wrapper
+set_property top zynq_design_wrapper [current_fileset]
+
+# Launch synthesis and wait
+launch_runs synth_1 -verbose
+wait_on_run synth_1
+
+# Launch implementation and wait
+launch_runs impl_1 -to_step write_bitstream -verbose
+wait_on_run impl_1
+
+# Open implementation run
+#open_run impl_1
+
+# Export hardware platform with bitstream embedded (XSA for Vitis/FSBL)
+write_hw_platform -fixed -include_bit -force ./hw_platform.xsa
+
+# Close zynq_minimal_proj
+close_project
+
+puts "Created and configured PS7 IP (block design) at $ip_dir/processing_system7_0"
 
 #
 # Ethernet IPs
