@@ -80,53 +80,20 @@ def setup(py_params_dict):
                 {"name": "uart_txd_o", "width": "1"},
             ],
         },
-        {
-            "name": "rgmii_io",
-            "descr": "RGMII ethernet interface",
-            "signals": [
-                {
-                    "name": "rgmii_txc_o",
-                    "width": "1",
-                    "descr": "Clock signal",
-                },
-                {
-                    "name": "rgmii_txd_o",
-                    "width": "4",
-                    "descr": "Data to be transmitted",
-                },
-                {
-                    "name": "rgmii_tx_ctl_o",
-                    "width": "1",
-                    "descr": "Multiplexing of transmitter enable and transmitter error",
-                },
-                {
-                    "name": "rgmii_rxc_i",
-                    "width": "1",
-                    "descr": "Received clock signal (recovered from incoming received data)",
-                },
-                {
-                    "name": "rgmii_rxd_i",
-                    "width": "4",
-                    "descr": "Received data",
-                },
-                {
-                    "name": "rgmii_rx_ctl_i",
-                    "width": "1",
-                    "descr": "Multiplexing of data received is valid and receiver error",
-                },
-                {
-                    "name": "rgmii_mdc_o",
-                    "width": "1",
-                    "descr": "Management interface clock",
-                },
-                {
-                    "name": "rgmii_mdio_io",
-                    "width": "1",
-                    "descr": "Management interface I/O",
-                },
-            ],
-        },
     ]
+    if params["use_ethernet"]:
+        attributes_dict["ports"] += [
+            {
+                "name": "rgmii_io",
+                "descr": "RGMII ethernet interface",
+                "signals": {
+                    "type": "mii",
+                    "widths": {
+                        "VARIANT": "rgmii",
+                    },
+                },
+            },
+        ]
 
     #
     # Wires
@@ -245,9 +212,8 @@ def setup(py_params_dict):
     #
     # Snippets
     #
-    attributes_dict["snippets"] = [
-        {
-            "verilog_code": """
+
+    snippet = """
    // General connections
    assign cke = 1'b1;
    assign arst = ~arst_n;
@@ -257,34 +223,56 @@ def setup(py_params_dict):
    assign rs232_cts = 1'b1;
 
    // ZYNQ7 Processing System module
-   processing_system7_0 processing_system7_0
-   (
-      .PS_CLK(FIXED_IO_ps_clk_io),
-      .PS_PORB(FIXED_IO_ps_porb_io),
-      .PS_SRSTB(FIXED_IO_ps_srstb_io),
+   // processing_system7_0 processing_system7_0
+   // (
+   //    .FCLK_CLK0(clk),
+   //    .FCLK_RESET0_N(arst_n),
+"""
+    if params["use_extmem"]:
+        snippet += """
+   //.HP0(axi_araddr),
+   //.HP0(axi_arvalid),
+   //.HP0(axi_arready),
+   //.HP0(axi_rdata),
+   //.HP0(axi_rresp),
+   //.HP0(axi_rvalid),
+   //.HP0(axi_rready),
+   //.HP0(axi_arid),
+   //.HP0(axi_arlen),
+   //.HP0(axi_arsize),
+   //.HP0(axi_arburst),
+   //.HP0(axi_arlock),
+   //.HP0(axi_arcache),
+   //.HP0(axi_arqos),
+   //.HP0(axi_rid),
+   //.HP0(axi_rlast),
+   //.HP0(axi_awaddr),
+   //.HP0(axi_awvalid),
+   //.HP0(axi_awready),
+   //.HP0(axi_wdata),
+   //.HP0(axi_wstrb),
+   //.HP0(axi_wvalid),
+   //.HP0(axi_wready),
+   //.HP0(axi_bresp),
+   //.HP0(axi_bvalid),
+   //.HP0(axi_bready),
+   //.HP0(axi_awid),
+   //.HP0(axi_awlen),
+   //.HP0(axi_awsize),
+   //.HP0(axi_awburst),
+   //.HP0(axi_awlock),
+   //.HP0(axi_awcache),
+   //.HP0(axi_awqos),
+   //.HP0(axi_wlast),
+   //.HP0(axi_bid),
+"""
+    snippet += """
+   // );
+"""
 
-      .FCLK_CLK0(clk),
-      .FCLK_RESET0_N(arst_n),
-
-      .DDR_Addr(DDR_addr),
-      .DDR_BankAddr(DDR_ba),
-      .DDR_CAS_n(DDR_cas_n),
-      .DDR_CKE(DDR_cke),
-      .DDR_CS_n(DDR_cs_n),
-      .DDR_Clk(DDR_ck_p),
-      .DDR_Clk_n(DDR_ck_n),
-      .DDR_DM(DDR_dm),
-      .DDR_DQ(DDR_dq),
-      .DDR_DQS(DDR_dqs_p),
-      .DDR_DQS_n(DDR_dqs_n),
-      .DDR_DRSTB(DDR_reset_n),
-      .DDR_ODT(DDR_odt),
-      .DDR_RAS_n(DDR_ras_n),
-      .DDR_VRN(FIXED_IO_ddr_vrn),
-      .DDR_VRP(FIXED_IO_ddr_vrp),
-      .DDR_WEB(DDR_we_n)
-   );
-            """,
+    attributes_dict["snippets"] = [
+        {
+            "verilog_code": snippet,
         },
     ]
 

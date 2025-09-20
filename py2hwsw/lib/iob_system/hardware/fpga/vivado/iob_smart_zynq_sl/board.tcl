@@ -22,19 +22,20 @@ if { ![file isdirectory $ip_dir]} {
 #
 
 # Create PS7 IP core (Xilinx Processing System 7)
+# Product Guide: https://docs.amd.com/v/u/en-US/pg082-processing-system7
 create_ip -name processing_system7 -vendor xilinx.com -library ip -version 5.5 -module_name processing_system7_0 -dir $ip_dir -force
 
 # NOTE: Configure PS7 IP core here
-# set clock, reset, and disable M_AXI_GP0
+# - Enable FCLK0 (system clock)
+# - Configure FCLK0 frequency
+# - Enable FCLK_RESET0_N (system reset)
+# - Disable M_AXI_GP0 (General purpose manager AXI bus)
 set_property -dict [list \
-    CONFIG.PCW_EN_CLK0_PORT {1} \
-    CONFIG.PCW_EN_RST0_PORT {1} \
     CONFIG.PCW_USE_M_AXI_GP0 {0} \
-    CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {50.0} \
 ] [get_ips processing_system7_0]
 
 if { $USE_EXTMEM > 0 } {
-    # Enable HP0 AXI slave interface for DDR
+    # Enable HP0 AXI slave interface for DDR (runs at FCLK0 frequency)
     set_property CONFIG.PCW_USE_S_AXI_HP0 {1} [get_ips processing_system7_0]
     # Optionally set data width (default is 32, can be 64 or 128 depending on your design)
     # set_property CONFIG.PCW_S_AXI_HP0_DATA_WIDTH {32} [get_ips processing_system7_0]

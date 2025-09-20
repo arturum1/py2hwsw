@@ -70,7 +70,8 @@ sim-clean:
 fpga-build:
 	nix-shell --run "make clean setup && make -C $(BUILD_DIR) fpga-sw-build BOARD=$(BOARD)" && make -C $(BUILD_DIR)/ fpga-build BOARD=$(BOARD)
 
-fpga-run: fpga-build
+fpga-run:
+	nix-shell --run "make -C $(BUILD_DIR) fpga-sw-build BOARD=$(BOARD)"
 	make -C $(BUILD_DIR)/ fpga-run BOARD=$(BOARD)
 
 
