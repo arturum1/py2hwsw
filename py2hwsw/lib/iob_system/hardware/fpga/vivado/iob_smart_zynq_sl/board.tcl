@@ -22,7 +22,7 @@ if { ![file isdirectory $ip_dir]} {
 #
 
 # Create PS7 IP core (Xilinx Processing System 7)
-create_ip -name processing_system7 -vendor xilinx.com -library ip -version 5.5 -module_name processing_system7_0 -directory $ip_dir
+create_ip -name processing_system7 -vendor xilinx.com -library ip -version 5.5 -module_name processing_system7_0 -dir $ip_dir -force
 
 # NOTE: Configure PS7 IP core here
 # set clock, reset, and disable M_AXI_GP0
@@ -60,10 +60,3 @@ if { $USE_ETHERNET > 0 } {
     read_verilog vivado/$BOARD/iob_xilinx_ibufg.v
     read_verilog vivado/$BOARD/iob_xilinx_oddre1.v
 }
-
-#
-# Constraints
-#
-
-# Source *_dev.tcl file, since by default build.tcl only sources *_dev.sdc
-source "iob_system_dev.tcl"

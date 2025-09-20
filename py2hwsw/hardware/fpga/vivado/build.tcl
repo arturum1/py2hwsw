@@ -68,6 +68,11 @@ if { $IS_FPGA == "1" } {
     eval synth_design -include_dirs ../src -include_dirs ../common_src -include_dirs ./src -include_dirs ./vivado/$BOARD $SYNTH_FLAGS -part $PART -top $FPGA_TOP -mode out_of_context -flatten_hierarchy full -verbose
 }
 
+# Apply constraints via .tcl script (allows conditional constraints)
+if {[file exists "vivado/$BOARD/$NAME\_dev.tcl"]} {
+    source vivado/$BOARD/$NAME\_dev.tcl
+}
+
 #set post-map custom assignments
 if {[file exists "vivado/postmap.tcl"]} {
     source "vivado/postmap.tcl"
@@ -100,3 +105,6 @@ if { $IS_FPGA == "1" } {
     write_verilog -force $FPGA_TOP\_netlist.v
     write_verilog -force -mode synth_stub ${FPGA_TOP}_stub.v
 }
+
+# Export hardware platform (used to later import in Xilinx vitis for FSBL generation on Zynq boards)
+write_hw_platform -force -file hw_platform.xsa

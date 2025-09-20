@@ -20,15 +20,21 @@ FPGA_STUB=$(FPGA_TOP)_stub.v
 endif
 
 
-FPGA_PROG=vivado -nojournal -log vivado.log -mode batch -source vivado/prog.tcl -tclargs $(FPGA_TOP) $(BOARD_DEVICE_ID)
+FPGA_PROG=vivado -nojournal -log vivado.log -mode batch -source vivado/prog.tcl -tclargs $(FPGA_TOP) "$(FSBL) " "$(BOARD_DEVICE_ID) "
 
 # work-around for http://svn.clifford.at/handicraft/2016/vivadosig11
 export RDI_VERBOSE = False
 
 VIVADO_FLAGS= -nojournal -log reports/vivado.log -mode batch -source vivado/build.tcl -tclargs $(NAME) $(FPGA_TOP) $(CSR_IF) $(BOARD) "$(VSRC)" " $(INCLUDE_DIRS)" $(IS_FPGA) $(USE_EXTMEM) $(USE_ETHERNET)
 
+VITIS_FLAGS= -mode batch -source vitis_fsbl.tcl -tclargs $(NAME)
+
 $(FPGA_OBJ): $(VSRC) $(VHDR) $(wildcard $(BOARD)/*.sdc)
 	mkdir -p reports && vivado $(VIVADO_FLAGS) 
+ifneq ($(FSBL),)
+	vitis $(VITIS_FLAGS)
+	mv hw_platform/$(NAME)/Debug/$(NAME).elf $(FSBL)
+endif
 
 vivado-clean:
 	@rm -rf .Xil
