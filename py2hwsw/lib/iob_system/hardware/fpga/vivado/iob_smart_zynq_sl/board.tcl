@@ -24,7 +24,8 @@ if { ![file isdirectory $ip_dir]} {
 puts "Creating minimal block design project to generate ZYNQ Processing System 7"
 
 # Create new project in subdirectory
-create_project zynq_minimal_proj ./zynq_minimal_proj -force
+create_project -force zynq_minimal_proj ./zynq_minimal_proj -part $PART
+set_property target_language Verilog [current_project]
 
 # Create the block design
 create_bd_design zynq_design
@@ -83,9 +84,6 @@ wait_on_run synth_1
 # Launch implementation and wait
 launch_runs impl_1 -to_step write_bitstream -verbose
 wait_on_run impl_1
-
-# Open implementation run
-#open_run impl_1
 
 # Export hardware platform with bitstream embedded (XSA for Vitis/FSBL)
 write_hw_platform -fixed -include_bit -force ./hw_platform.xsa

@@ -34,7 +34,7 @@ $(FPGA_OBJ): $(VSRC) $(VHDR) $(wildcard $(BOARD)/*.sdc)
 
 $(FSBL): $(FPGA_OBJ)
 	vitis $(VITIS_FLAGS)
-	mv hw_platform/$(NAME)/Debug/$(NAME).elf $(FSBL)
+	mv vitis_ws/$(NAME)/build/$(NAME).elf $(FSBL)
 
 vivado-clean:
 	@rm -rf .Xil
