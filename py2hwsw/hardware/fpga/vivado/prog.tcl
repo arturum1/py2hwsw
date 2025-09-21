@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 # Extract CLI args
-set vars {BITSTREAM FSBL DEVICE_ID}
+set vars {BITSTREAM DEVICE_ID HW_TARGET}
 foreach var $vars arg $argv {
    set trimmed_arg [string trim $arg]
    if {$trimmed_arg != ""} {
@@ -15,8 +15,13 @@ foreach var $vars arg $argv {
 }
 
 if {![info exists DEVICE_ID]} {
-    # If DEVICE_ID is not defined, set it to zero
+    # If DEVICE_ID (index in JTAG chain) is not defined, set it to zero by default
     set DEVICE_ID 0
+}
+
+if {![info exists HW_TARGET]} {
+    # If HW_TARGET is not defined, use Digilent cable as the default
+    set HW_TARGET */xilinx_tcf/Digilent/*
 }
 
 #place holder for future remote execution
@@ -36,12 +41,22 @@ if { [catch {connect_hw_server -url $HOST:3121} result] } {
     exit result
 }
 
+# # Print all available hardware targets
+# set hw_targets [get_hw_targets]
+# puts "Hardware targets:"
+# foreach t $hw_targets { puts $t }
+
 # Open the target device on the hardware server
-current_hw_target [get_hw_targets */xilinx_tcf/Digilent/*]
+current_hw_target [get_hw_targets $HW_TARGET]
 if { [catch {open_hw_target} result] } {
     puts "ERROR: Can't open hardware target.\n"
     exit result
 }
+
+# # Print all available hardware devices
+# set hw_devices [get_hw_devices]
+# puts "Hardware devices:"
+# foreach d $hw_devices { puts $d }
 
 set HW_DEVICE [lindex [get_hw_devices] $DEVICE_ID]
 
@@ -65,34 +80,6 @@ if { [catch {program_hw_devices $HW_DEVICE} result] } {
 if { [catch {refresh_hw_device $HW_DEVICE} result] } {
     puts "ERROR: Can't refresh hardware device.\n"
     exit result
-}
-
-# If FSBL ELF is provided, download and run it on PS7
-if { [info exists FSBL] } {
-    # Find the processor for PS7 (Zynq typically has one ARM core: ps7_cortexa9_0)
-    set PROCESSORS [get_hw_procs]
-    set FOUND_PS7 0
-    foreach proc $PROCESSORS {
-        if {[regexp {ps7_cortexa9_0} $proc]} {
-            set FOUND_PS7 1
-            set PS7_PROC $proc
-            break
-        }
-    }
-    if {$FOUND_PS7} {
-        # Download and run the ELF
-        if { [catch {dow $FSBL} result] } {
-            puts "ERROR: Can't download ELF to PS7.\n"
-            exit result
-        }
-        if { [catch {run} result] } {
-            puts "ERROR: Can't run ELF on PS7.\n"
-            exit result
-        }
-        puts "FSBL ELF loaded and started on PS7."
-    } else {
-        puts "ERROR: PS7 processor not found. ELF not loaded."
-    }
 }
 
 # Close hardware target and server

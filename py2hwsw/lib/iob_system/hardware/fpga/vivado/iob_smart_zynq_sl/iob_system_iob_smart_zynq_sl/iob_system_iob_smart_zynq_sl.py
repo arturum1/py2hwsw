@@ -223,10 +223,10 @@ def setup(py_params_dict):
    assign rs232_cts = 1'b1;
 
    // ZYNQ7 Processing System module
-   // processing_system7_0 processing_system7_0
-   // (
-   //    .FCLK_CLK0(clk),
-   //    .FCLK_RESET0_N(arst_n),
+   zynq_design_processing_system7_0_0 processing_system7_0
+   (
+      .FCLK_CLK0(clk),
+      .FCLK_RESET0_N(arst_n),
 """
     if params["use_extmem"]:
         snippet += """
@@ -266,8 +266,13 @@ def setup(py_params_dict):
    //.HP0(axi_wlast),
    //.HP0(axi_bid),
 """
+    # Remove last comma
+    lines = snippet.splitlines()
+    lines[-1] = lines[-1].rstrip(",")
+    snippet = "\n".join(lines)
+
     snippet += """
-   // );
+   );
 """
 
     attributes_dict["snippets"] = [

@@ -21,7 +21,9 @@ if { ![file isdirectory $ip_dir]} {
 # Xilinx Processing System 7 IP
 #
 
+puts "\n\n#########################################################"
 puts "Creating minimal block design project to generate ZYNQ Processing System 7"
+puts "#########################################################\n\n"
 
 # Create new project in subdirectory
 create_project -force zynq_minimal_proj ./zynq_minimal_proj -part $PART
@@ -51,13 +53,16 @@ set_property -dict [list \
 
 if { $USE_EXTMEM > 0 } {
     # Enable HP0 AXI slave interface for DDR (runs at FCLK0 frequency)
-    set_property CONFIG.PCW_USE_S_AXI_HP0 {1} [get_ips processing_system7_0]
+    set_property CONFIG.PCW_USE_S_AXI_HP0 {1} [get_bd_cells processing_system7_0]
     # Optionally set data width (default is 32, can be 64 or 128 depending on your design)
     # set_property CONFIG.PCW_S_AXI_HP0_DATA_WIDTH {32} [get_ips processing_system7_0]
     # You can enable other HP ports similarly:
     # set_property CONFIG.PCW_USE_S_AXI_HP1 {1} [get_ips processing_system7_0]
     # etc.
 }
+
+# Print PS7 IP configuration
+report_property [get_bd_cells processing_system7_0]
 
 # Validate design
 validate_bd_design
@@ -91,7 +96,17 @@ write_hw_platform -fixed -include_bit -force ./hw_platform.xsa
 # Close zynq_minimal_proj
 close_project
 
-puts "Created and configured PS7 IP (block design) at $ip_dir/processing_system7_0"
+puts "\n\n#########################################################"
+puts "Created and configured PS7 IP (block design) at zynq_minimal_proj/zynq_minimal_proj.gen/sources_1/bd/zynq_design/ip/zynq_design_processing_system7_0_0/synth/zynq_design_processing_system7_0_0.v"
+puts "#########################################################\n\n"
+# It would be nice if we could just do this instead of creating an entire vivado project with block design.
+# But since we need the .xsa file for Vitis, I don't think it is possible.
+# create_ip -vlnv xilinx.com:ip:processing_system7:5.5 -module_name processing_system7_0
+
+# Copy file and include PS7 IP in the project
+import_ip zynq_minimal_proj/zynq_minimal_proj.srcs/sources_1/bd/zynq_design/ip/zynq_design_processing_system7_0_0/zynq_design_processing_system7_0_0.xci
+# Print PS7 IP configuration
+report_property [get_ips zynq_design_processing_system7_0_0]
 
 #
 # Ethernet IPs

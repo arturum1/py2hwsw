@@ -20,7 +20,12 @@ FPGA_STUB=$(FPGA_TOP)_stub.v
 endif
 
 
-FPGA_PROG=vivado -nojournal -log vivado.log -mode batch -source vivado/prog.tcl -tclargs $(FPGA_TOP) "$(FSBL) " "$(BOARD_DEVICE_ID) "
+FPGA_PROG=vivado -nojournal -log vivado.log -mode batch -source vivado/prog.tcl -tclargs $(FPGA_TOP).bit "$(BOARD_DEVICE_ID) " "$(HW_TARGET) "
+
+ifneq ($(FSBL),)
+# Program Zynq PS7 CPU as well
+FPGA_PROG+= && vitis --source vivado/vitis_prog.py $(FSBL)
+endif
 
 # work-around for http://svn.clifford.at/handicraft/2016/vivadosig11
 export RDI_VERBOSE = False
