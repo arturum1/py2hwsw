@@ -57,14 +57,14 @@ UFLAGS+=USE_QUARTUS_PRO=$(USE_QUARTUS_PRO)
 #build fpga image or netlist
 build: $(VHDR) $(VSRC) $(BUILD_DEPS)
 ifeq ($(FPGA_SERVER),)
-	make $(FPGA_OBJ) $(FSBL)
+	make $(FPGA_OBJ) $(PS7_FSBL)
 else 
 	ssh $(FPGA_SSH_FLAGS) $(FPGA_USER)@$(FPGA_SERVER) "if [ ! -d $(REMOTE_BUILD_DIR) ]; then mkdir -p $(REMOTE_BUILD_DIR); fi"
 	rsync $(FPGA_SYNC_FLAGS) -avz --force --delete --exclude 'software/tb' ../.. $(FPGA_USER)@$(FPGA_SERVER):$(REMOTE_BUILD_DIR)
 	ssh -t $(FPGA_SSH_FLAGS) $(FPGA_USER)@$(FPGA_SERVER) 'if [ -f quartus_env ]; then source quartus_env $(USE_QUARTUS_PRO); fi; make -C $(REMOTE_FPGA_DIR) $@ BOARD=$(BOARD) $(UFLAGS)'
 	scp $(FPGA_SCP_FLAGS) $(FPGA_USER)@$(FPGA_SERVER):$(REMOTE_FPGA_DIR)/$(FPGA_OBJ) .
-ifneq ($(FSBL),)
-	scp $(FPGA_SCP_FLAGS) $(FPGA_USER)@$(FPGA_SERVER):$(REMOTE_FPGA_DIR)/$(FSBL) .
+ifneq ($(PS7_FSBL),)
+	scp $(FPGA_SCP_FLAGS) $(FPGA_USER)@$(FPGA_SERVER):$(REMOTE_FPGA_DIR)/$(PS7_FSBL) .
 endif
 	scp -r $(FPGA_SCP_FLAGS) $(FPGA_USER)@$(FPGA_SERVER):$(REMOTE_FPGA_DIR)/reports .
 ifneq ($(FPGA_STUB),)

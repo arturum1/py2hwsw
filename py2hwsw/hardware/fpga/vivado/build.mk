@@ -20,11 +20,11 @@ FPGA_STUB=$(FPGA_TOP)_stub.v
 endif
 
 
-FPGA_PROG=vivado -nojournal -log vivado.log -mode batch -source vivado/prog.tcl -tclargs $(FPGA_TOP).bit "$(BOARD_DEVICE_ID) " "$(HW_TARGET) "
+FPGA_PROG=vivado -nojournal -log vivado.log -mode batch -source vivado/prog.tcl -tclargs $(FPGA_TOP).bit "$(BOARD_DEVICE_ID) " "$(BOARD_HW_TARGET) "
 
-ifneq ($(FSBL),)
+ifneq ($(PS7_FSBL),)
 # Program Zynq PS7 CPU as well
-FPGA_PROG+= && vitis --source vivado/vitis_prog.py $(FSBL)
+FPGA_PROG+= && vitis --source vivado/vitis_prog.py $(PS7_FSBL) $(PS7_FW)
 endif
 
 # work-around for http://svn.clifford.at/handicraft/2016/vivadosig11
@@ -37,9 +37,10 @@ VITIS_FLAGS= --source vivado/vitis_build.py $(NAME)
 $(FPGA_OBJ): $(VSRC) $(VHDR) $(wildcard $(BOARD)/*.sdc)
 	mkdir -p reports && vivado $(VIVADO_FLAGS) 
 
-$(FSBL): $(FPGA_OBJ)
+$(PS7_FSBL) $(PS7_FW): $(FPGA_OBJ)
 	vitis $(VITIS_FLAGS)
-	mv vitis_ws/$(NAME)/build/$(NAME).elf $(FSBL)
+	mv vitis_ws/platform/zynq_fsbl/build/fsbl.elf $(PS7_FSBL)
+	mv vitis_ws/$(NAME)/build/$(NAME).elf $(PS7_FW)
 
 vivado-clean:
 	@rm -rf .Xil

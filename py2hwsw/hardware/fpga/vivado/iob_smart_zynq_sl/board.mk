@@ -5,9 +5,9 @@
 BOARD_SERVER=$(SMART_SERVER)
 BOARD_USER=$(SMART_USER)
 BOARD_SERIAL_PORT=$(SMART_SERIAL_PORT)
-FSBL=$(NAME)_fsbl.elf
-HW_TARGET=*/xilinx_tcf/Xilinx/*
-
+PS7_FSBL=$(NAME)_ps7_fsbl.elf
+PS7_FW=$(NAME)_ps7_fw.elf
+BOARD_HW_TARGET=*/xilinx_tcf/Xilinx/*
 # Smart Zynq SL has two hardware devices:
 # arm_dap_0
 # xc7z020_1

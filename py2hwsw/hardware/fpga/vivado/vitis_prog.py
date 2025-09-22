@@ -8,7 +8,7 @@ import sys
 import xsdb
 
 
-def program_ps7_cpu(elf_path):
+def program_ps7_cpu(fsbl_elf_path, elf_path):
     # Start debug session
     session = xsdb.start_debug_session()
 
@@ -22,10 +22,15 @@ def program_ps7_cpu(elf_path):
     # Reset system (optional)
     # session.rst(type="system")
 
+    # Program FSBL ELF which performs PS7 init and DDR release
+    print(f"Downloading FSBL ELF: {fsbl_elf_path}")
+    session.dow(fsbl_elf_path)
+    # Run the program
+    session.con()
+
     # Download ELF to the target CPU
     print(f"Downloading ELF: {elf_path}")
     session.dow(elf_path)
-
     # Run the program
     session.con()
 
@@ -35,5 +40,6 @@ def program_ps7_cpu(elf_path):
 
 
 if __name__ == "__main__":
-    elf_file_path = sys.argv[1]
-    program_ps7_cpu(elf_file_path)
+    fsbl_file_path = sys.argv[1]
+    elf_file_path = sys.argv[2]
+    program_ps7_cpu(fsbl_file_path, elf_file_path)
