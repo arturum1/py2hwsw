@@ -5,8 +5,8 @@
 # Set FPGA part for the project
 set PART xc7z020clg484-1
 
+# Call vivado in a subshell (will run in project mode without affecting this one)
 puts "\n\n #### Calling vivado in subshell to create PS7 BD design ####\n\n"
-# Call vivado in a subshell (will run in interactive mode without affecting this one)
 exec vivado -nojournal -log reports/vivado_ps7.log -mode batch -source vivado/$BOARD/ps7_ip.tcl -tclargs $USE_EXTMEM >@stdout 2>@stderr
 puts "\n\n #### Vivado subshell finished creating PS7 BD design ####\n\n"
 

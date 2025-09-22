@@ -9,10 +9,10 @@ foreach var $vars arg $argv {
     puts "$var = $arg"
 }
 
-# Read board properties
-source vivado/$BOARD/board.tcl
 
 # Read verilog sources, vivado IPs, use file extension
+# NOTE: Calling these commands (read_verilog) will cause vivado to open a 'project' in non-project mode.
+# With this we can set properties in [current_project]. For example: 'set_property part $PART [current_project]'
 foreach file [split $VSRC \ ] {
     puts $file
     if { [ file extension $file ] == ".edif" } {
@@ -21,6 +21,9 @@ foreach file [split $VSRC \ ] {
         read_verilog -sv $file
     }
 }
+
+# Read board properties
+source vivado/$BOARD/board.tcl
 
 # Set pre-map custom assignments
 if {[file exists "vivado/premap.tcl"]} {
