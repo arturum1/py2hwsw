@@ -9,6 +9,9 @@ foreach var $vars arg $argv {
     puts "$var = $arg"
 }
 
+# Read board properties
+source vivado/$BOARD/board.tcl
+
 # Read verilog sources, vivado IPs, use file extension
 foreach file [split $VSRC \ ] {
     puts $file
@@ -19,19 +22,15 @@ foreach file [split $VSRC \ ] {
     }
 }
 
+# Set pre-map custom assignments
+if {[file exists "vivado/premap.tcl"]} {
+    source "vivado/premap.tcl"
+}
+
 # include directories, use -include_dirs option
 set SYNTH_FLAGS {}
 foreach dir $INCLUDE_DIRS {
     lappend SYNTH_FLAGS "-include_dirs" "${dir}"
-}
-
-# Read board properties
-source vivado/$BOARD/board.tcl
-
-
-# Set pre-map custom assignments
-if {[file exists "vivado/premap.tcl"]} {
-    source "vivado/premap.tcl"
 }
 
 

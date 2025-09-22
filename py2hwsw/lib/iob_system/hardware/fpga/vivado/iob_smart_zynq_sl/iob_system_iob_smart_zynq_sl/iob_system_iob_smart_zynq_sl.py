@@ -80,6 +80,40 @@ def setup(py_params_dict):
                 {"name": "uart_txd_o", "width": "1"},
             ],
         },
+        {
+            "name": "leds_o",
+            "descr": "debug leds",
+            "signals": [
+                {"name": "led1_o", "width": "1"},
+                {"name": "led2_o", "width": "1"},
+            ],
+        },
+        {
+            "name": "ps7_io",
+            "descr": "Silicon fixed IO for Zynq PS7",
+            "signals": [
+                {"name": "DDR_CAS_n_io", "width": "1"},
+                {"name": "DDR_CKE_io", "width": "1"},
+                {"name": "DDR_Clk_n_io", "width": "1"},
+                {"name": "DDR_Clk_io", "width": "1"},
+                {"name": "DDR_CS_n_io", "width": "1"},
+                {"name": "DDR_DRSTB_io", "width": "1"},
+                {"name": "DDR_ODT_io", "width": "1"},
+                {"name": "DDR_RAS_n_io", "width": "1"},
+                {"name": "DDR_WEB_io", "width": "1"},
+                {"name": "DDR_BankAddr_io", "width": "3"},
+                {"name": "DDR_Addr_io", "width": "15"},
+                {"name": "DDR_VRN_io", "width": "1"},
+                {"name": "DDR_VRP_io", "width": "1"},
+                {"name": "DDR_DM_io", "width": "4"},
+                {"name": "DDR_DQ_io", "width": "32"},
+                {"name": "DDR_DQS_n_io", "width": "4"},
+                {"name": "DDR_DQS_io", "width": "4"},
+                {"name": "PS_SRSTB_io", "width": "1"},
+                {"name": "PS_CLK_io", "width": "1"},
+                {"name": "PS_PORB_io", "width": "1"},
+            ],
+        },
     ]
     if params["use_ethernet"]:
         attributes_dict["ports"] += [
@@ -222,9 +256,46 @@ def setup(py_params_dict):
    assign rs232_rxd = uart_rxd_i;
    assign rs232_cts = 1'b1;
 
+   // DEBUG LEDS
+   localparam T1MS = 26'd50_000_000 ; //50MHz - Timer target reached in 1 second
+   reg [25:0] time_count=26'd0;
+   reg led_reg=1'b0;
+   always@(posedge clk)
+       if(time_count>=T1MS)begin
+           time_count<=26'd0;
+           led_reg<=~led_reg;
+       end
+       else time_count<=time_count+1'b1;
+   assign led1_o=led_reg;
+   assign led2_o=arst;
+
    // ZYNQ7 Processing System module
    zynq_design_processing_system7_0_0 processing_system7_0
    (
+      // Silicon fixed ports (non-configurable)
+      .MIO(),
+      .DDR_CAS_n(DDR_CAS_n_io),
+      .DDR_CKE(DDR_CKE_io),
+      .DDR_Clk_n(DDR_Clk_n_io),
+      .DDR_Clk(DDR_Clk_io),
+      .DDR_CS_n(DDR_CS_n_io),
+      .DDR_DRSTB(DDR_DRSTB_io),
+      .DDR_ODT(DDR_ODT_io),
+      .DDR_RAS_n(DDR_RAS_n_io),
+      .DDR_WEB(DDR_WEB_io),
+      .DDR_BankAddr(DDR_BankAddr_io),
+      .DDR_Addr(DDR_Addr_io),
+      .DDR_VRN(DDR_VRN_io),
+      .DDR_VRP(DDR_VRP_io),
+      .DDR_DM(DDR_DM_io),
+      .DDR_DQ(DDR_DQ_io),
+      .DDR_DQS_n(DDR_DQS_n_io),
+      .DDR_DQS(DDR_DQS_io),
+      .PS_SRSTB(PS_SRSTB_io),
+      .PS_CLK(PS_CLK_io),
+      .PS_PORB(PS_PORB_io),
+
+      // Configurable ports
       .FCLK_CLK0(clk),
       .FCLK_RESET0_N(arst_n),
 """
