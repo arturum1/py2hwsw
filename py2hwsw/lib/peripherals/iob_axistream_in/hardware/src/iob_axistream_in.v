@@ -54,6 +54,8 @@ module iob_axistream_in #(
    wire [                                   DATA_W-1:0] int_tdata;
    wire                                                 int_tready;
 
+   wire [         2-1:0] fifo2axis_lvl;
+
    `include "iob_axistream_in_wires.vs"
 
    // configuration control and status register file.
@@ -75,9 +77,9 @@ module iob_axistream_in #(
    assign int_tready     = (mode_wr) ? sys_tready_i : data_rready_rd;
 
    // empty = fifo empty + no data in fifo2axis
-   assign fifo_empty_rd  = fifo_empty & (~int_tvalid);
+   assign fifo_empty_rd  = fifo_empty & ~(|fifo2axis_lvl);
    // level = fifo level + data in fifo2axis
-   assign fifo_level_rd  = fifo_level + int_tvalid;
+   assign fifo_level_rd  = fifo_level + fifo2axis_lvl;
 
    wire ready_int;
    // Ready if not full and, if in CSR mode, tlast not detected
@@ -263,7 +265,7 @@ module iob_axistream_in #(
       end
    endgenerate
 
-   iob_fifo2axis #(
+   iob_fifo2axis_t_l_e #(
       .DATA_W    (DATA_W),
       .AXIS_LEN_W(1)
    ) fifo2axis_inst (
@@ -271,7 +273,7 @@ module iob_axistream_in #(
       .rst_i        (soft_reset_wr),
       .en_i         (1'b1),
       .len_i        (1'b1),
-      .level_o      (),
+      .level_o      (fifo2axis_lvl),
       // FIFO I/F
       .fifo_empty_i (fifo_empty),
       .fifo_read_o  (fifo_read),

@@ -328,8 +328,9 @@ def generate_memory_map(attributes_dict, peripherals_list, params, py_params):
             cpu_subblock["reset_addr"] = bootrom_addr
         peripherals_addr = memory_map.get("peripherals", None)
         if peripherals_addr is not None:
-            cpu_subblock["uncached_start_addr"] = peripherals_addr
-            cpu_subblock["uncached_size"] = 2**region_width
+            if params["auto_uncached"]:
+                cpu_subblock["uncached_start_addr"] = peripherals_addr
+                cpu_subblock["uncached_size"] = 2**region_width
 
 
 def generate_peripheral_base_addresses(
@@ -448,6 +449,7 @@ get_uut_build_deps:
 get_uut_run_deps:
 	make -C $(ROOT_DIR)/$(RELATIVE_PATH_TO_UUT)/hardware/fpga run_deps
 	-cp $(ROOT_DIR)/$(RELATIVE_PATH_TO_UUT)/hardware/fpga/*.hex .
+	-cp $(ROOT_DIR)/$(RELATIVE_PATH_TO_UUT)/hardware/fpga/*.bin .
 
 .PHONY: get_uut_build_deps get_uut_run_deps
 """
@@ -477,6 +479,7 @@ HEX+=get_uut_hex
 get_uut_hex:
 	make -C $(ROOT_DIR)/$(RELATIVE_PATH_TO_UUT)/hardware/simulation build_hex
 	-cp $(ROOT_DIR)/$(RELATIVE_PATH_TO_UUT)/hardware/simulation/*.hex .
+	-cp $(ROOT_DIR)/$(RELATIVE_PATH_TO_UUT)/hardware/simulation/*.bin .
 
 .PHONY: get_uut_hex
 """

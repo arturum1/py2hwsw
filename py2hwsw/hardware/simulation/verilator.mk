@@ -29,7 +29,7 @@ VFLAGS+=--cc --exe --top-module $(VTOP) #compile to C++, alow user C/C++ code, a
 VFLAGS+=-Wno-lint --Wno-UNOPTFLAT
 VFLAGS+=--no-timing
 ifeq ($(VCD),1)
-VFLAGS+=--trace -DVCD
+VFLAGS+=--trace --trace-fst -DVCD
 endif
 
 comp: $(VHDR) $(VSRC) $(HEX) $(COBJ)

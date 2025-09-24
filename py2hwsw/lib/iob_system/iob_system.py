@@ -35,6 +35,8 @@ def setup(py_params_dict):
         CPU. This port will give direct access to the system's peripherals. The internal
         memories and crossbar will be removed.""",
         ),
+        "auto_uncached": (True, """If set to "true", the iob_system will define the uncached region to
+        be the peripheral memory region. If set to "false", the user must define the uncached memory region."""),
         "system_attributes": (
             {},
             "Core dictionary with attributes to override/append to the ones of iob_system. Usually passed by child cores to add their own components.",

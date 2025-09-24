@@ -18,6 +18,14 @@ def setup(py_params_dict):
     if isinstance(use_en, str):
         use_en = use_en.lower() == "true"
 
+    NAME = "iob_fifo2axis"
+    if use_tlast:
+        NAME += "_t"
+    if use_level:
+        NAME += "_l"
+    if use_en:
+        NAME += "_e"
+
     # Set ports based on the parameters
     ports = [
         {
@@ -227,6 +235,7 @@ def setup(py_params_dict):
 
     # Setup the module
     attributes_dict = {
+        "name": NAME,
         "generate_hw": True,
         "confs": [
             {
