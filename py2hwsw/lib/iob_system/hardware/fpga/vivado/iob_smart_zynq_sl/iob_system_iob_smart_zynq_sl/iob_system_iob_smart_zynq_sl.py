@@ -255,18 +255,31 @@ def setup(py_params_dict):
     #
 
     snippet = """
+   localparam T1MS = 26'd50_000_000 ; //50MHz - Timer target reached in 1 second
+
+   // Connect clock to external oscillator
+   assign clk = clk_50_i;
+
+   // Generate a 1 second resetn signal
+   reg [25:0] rst_time_count = 26'd0;
+   reg rst_n = 1'b0;
+   always@(posedge clk)
+      if(rst_time_count<T1MS)begin
+         rst_time_count<=rst_time_count+1'b1;
+      end
+      else rst_n<=1'b1;
+   assign arst_n = rst_n;
+
+
    // General connections
    assign cke = 1'b1;
    assign arst = ~arst_n;
-   // Connect clock to external oscillator
-   assign clk = clk_50_i;
 
    assign uart_txd_o = rs232_txd;
    assign rs232_rxd = uart_rxd_i;
    assign rs232_cts = 1'b1;
 
    // DEBUG LEDS
-   localparam T1MS = 26'd50_000_000 ; //50MHz - Timer target reached in 1 second
    reg [25:0] time_count=26'd0;
    reg led_reg=1'b0;
    always@(posedge clk)
