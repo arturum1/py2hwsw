@@ -73,6 +73,13 @@ def setup(py_params_dict):
     #
     attributes_dict["ports"] = [
         {
+            "name": "clk_50_i",
+            "descr": "50MHz clock input from external oscillator",
+            "signals": [
+                {"name": "clk_50_i", "width": "1"},
+            ],
+        },
+        {
             "name": "rs232_io",
             "descr": "Serial port",
             "signals": [
@@ -251,6 +258,8 @@ def setup(py_params_dict):
    // General connections
    assign cke = 1'b1;
    assign arst = ~arst_n;
+   // Connect clock to external oscillator
+   assign clk = clk_50_i;
 
    assign uart_txd_o = rs232_txd;
    assign rs232_rxd = uart_rxd_i;
@@ -293,11 +302,11 @@ def setup(py_params_dict):
       .DDR_DQS(DDR_DQS_io),
       .PS_SRSTB(PS_SRSTB_io),
       .PS_CLK(PS_CLK_io),
-      .PS_PORB(PS_PORB_io),
+      .PS_PORB(PS_PORB_io)
 
       // Configurable ports
-      .FCLK_CLK0(clk),
-      .FCLK_RESET0_N(arst_n),
+      //.FCLK_CLK0(clk),
+      //.FCLK_RESET0_N(arst_n),
 """
     if params["use_extmem"]:
         snippet += """

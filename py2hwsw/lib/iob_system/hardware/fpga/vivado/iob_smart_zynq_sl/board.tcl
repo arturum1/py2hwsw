@@ -6,17 +6,22 @@
 set PART xc7z020clg484-1
 
 # Call vivado in a subshell (will run in project mode without affecting this one)
-puts "\n\n #### Calling vivado in subshell to create PS7 BD design ####\n\n"
-exec vivado -nojournal -log reports/vivado_ps7.log -mode batch -source vivado/$BOARD/ps7_ip.tcl -tclargs $USE_EXTMEM >@stdout 2>@stderr
-puts "\n\n #### Vivado subshell finished creating PS7 BD design ####\n\n"
+# puts "\n\n #### Calling vivado in subshell to create PS7 BD design ####\n\n"
+# exec vivado -nojournal -log reports/vivado_ps7.log -mode batch -source vivado/$BOARD/ps7_ip.tcl -tclargs $USE_EXTMEM >@stdout 2>@stderr
+# puts "\n\n #### Vivado subshell finished creating PS7 BD design ####\n\n"
 
 # Set correct FPGA
 set_property part $PART [current_project]
 
+# Create ip directory
+if { ![file isdirectory "./ip"]} {
+    file mkdir ./ip
+}
+
 # It would be nice if we could just do this instead of creating an entire vivado project with block design.
 # But since we need the .xsa file for Vitis, I don't think it is possible.
 # FIXME: DEBUG The PS7 IP was already created in BD design above. This is duplicate but just for testing.
-create_ip -vlnv xilinx.com:ip:processing_system7:5.5 -module_name zynq_design_processing_system7_0_0
+create_ip -name processing_system7 -vendor xilinx.com -library ip -version 5.5 -module_name zynq_design_processing_system7_0_0 -dir ./ip -force
 set_property -dict [list \
     CONFIG.PCW_USE_M_AXI_GP0 {0} \
 ] [get_ips zynq_design_processing_system7_0_0]
@@ -29,7 +34,7 @@ synth_ip [get_files ./ip/zynq_design_processing_system7_0_0/zynq_design_processi
 report_property [get_ips zynq_design_processing_system7_0_0]
 
 # Read constraints for PS7 fixed ports
-read_xdc vivado/$BOARD/ps7_io.sdc
+#read_xdc vivado/$BOARD/ps7_io.sdc
 
 #
 # Ethernet IPs

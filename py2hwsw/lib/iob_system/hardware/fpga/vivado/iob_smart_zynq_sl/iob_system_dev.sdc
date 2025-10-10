@@ -5,8 +5,8 @@
 # Constraints for Smart Zynq SL board, based on: http://www.hellofpga.com/wp-content/uploads/2023/05/SmartZynq_SL_Schematic_V1d3_20241005.pdf
 # Demo vivado project for this board: http://www.hellofpga.com/index.php/2023/04/27/smart-zynq_sp_sl_01_led/
 
-# create_clock -period 20 -name clk_50 [get_ports clk_i]
-# set_property -dict {PACKAGE_PIN M19 IOSTANDARD LVCMOS33} [get_ports clk_i]
+create_clock -period 20 -name clk_50 [get_ports clk_50_i]
+set_property -dict {PACKAGE_PIN M19 IOSTANDARD LVCMOS33} [get_ports clk_50_i]
 
 set_property -dict {PACKAGE_PIN M17 IOSTANDARD LVCMOS33} [get_ports uart_rxd_i]
 set_property -dict {PACKAGE_PIN L17 IOSTANDARD LVCMOS33} [get_ports uart_txd_o]
