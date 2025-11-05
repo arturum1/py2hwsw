@@ -361,6 +361,7 @@ def doc_setup(python_module):
 
     # General documentation
     write_git_revision_short_hash(f"{build_dir}/document/tsrc")
+    nix_permission_hack(f"{build_dir}/document/tsrc/shortHash.tex")
 
 
 def write_git_revision_short_hash(dst_dir):
@@ -638,6 +639,7 @@ def copy_rename_setup_subdir(core, directory, exclude_file_list=[]):
 
                 # if the fpga directory is found, copy it to the build_dir
                 if os.path.isdir(setup_fpga_dir):
+                    os.makedirs(build_tools_dir, exist_ok=True)
                     # Copy the tools directory files only
                     for file in os.listdir(setup_tools_dir):
                         setup_file = os.path.join(setup_tools_dir, file)
