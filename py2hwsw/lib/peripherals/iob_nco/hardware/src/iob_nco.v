@@ -23,6 +23,8 @@ module iob_nco #(
    wire [PERIOD_W-1:0] period_wdata;
    wire                period_wen;
 
+   wire                acc_en;
+
    `include "iob_nco_wires.vs"
 
    // configuration control and status register file.
@@ -142,6 +144,7 @@ module iob_nco #(
       .data_o(clk_out_o)
    );
 
+   assign acc_en = period_wen || (enable && (cnt == quant));
    //modulator accumulator
    iob_acc_ld #(
       .DATA_W(PERIOD_W)
@@ -150,7 +153,7 @@ module iob_nco #(
       .cke_i   (clk_in_cke_i),
       .arst_i  (clk_in_arst_i),
       .rst_i   (soft_reset),
-      .en_i    (enable),
+      .en_i    (acc_en),
       .ld_i    (period_wen),
       .ld_val_i(period_wdata),
       .incr_i  (diff),
