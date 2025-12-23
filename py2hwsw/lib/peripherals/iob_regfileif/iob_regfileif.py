@@ -188,6 +188,9 @@ def setup(py_params_dict):
                 csr["type"] = "W"
             # Do nothing for type "RW"
 
+    if "ports" in py_params_dict:
+        ports = ports + py_params_dict["ports"]
+
     if "verilog-snippets" in py_params_dict:
         snippets = snippets + py_params_dict["verilog-snippets"]
 
