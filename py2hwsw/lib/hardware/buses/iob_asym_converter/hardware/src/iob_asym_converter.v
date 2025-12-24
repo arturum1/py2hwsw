@@ -111,7 +111,7 @@ module iob_asym_converter #(
          assign ext_mem_w_data_o = w_data_i;
 
          //memory read port
-         assign ext_mem_r_en_o   = r_en_i;
+         assign ext_mem_r_en_o   = r_en_i && cke_i;
          assign ext_mem_r_addr_o = r_addr_i;
          assign r_data_o         = r_data_int;
       end
