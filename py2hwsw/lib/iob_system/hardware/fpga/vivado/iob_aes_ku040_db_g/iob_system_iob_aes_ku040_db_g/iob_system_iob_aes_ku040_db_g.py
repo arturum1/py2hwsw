@@ -58,7 +58,7 @@ def setup(py_params_dict):
                 "name": "FREQ",
                 "descr": "Clock frequency",
                 "type": "D",
-                "val": "83000000",
+                "val": "100000000",
             },
             {
                 "name": "XILINX",
