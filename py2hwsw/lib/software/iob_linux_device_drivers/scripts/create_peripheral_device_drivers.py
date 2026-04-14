@@ -1140,23 +1140,43 @@ def create_user_makefile(path, peripheral):
 #
 # {SPDX_PREFIX}License-Identifier: {peripheral['spdx_license']}
 
+# Default to dynamic linking for small size. 
+# Use 'make STATIC=1' for a (larger) standalone binary, with entire C standard library (libc) embedded into it.
+# To use STATIC=0, the following requirements apply:
+# - Shared Libraries: Your SoC's Linux system must have the libc.so (C standard library) installed in /lib or /usr/lib.
+# - ABI Match: The libc on your SoC must match the one used during compilation (e.g., if you compile with glibc, the SoC needs glibc).
+# - Dynamic Linker: The dynamic linker (e.g., /lib/ld-linux-riscv32...) must be present on the SoC.
+STATIC ?= 0
+
 # Select kernel-userspace interface: sysfs; dev; ioctl
 IF ?= sysfs
 UPPER_IF = $(shell echo $(IF) | tr '[:lower:]' '[:upper:]')
+
+BIN = {peripheral['name']}_user
+
 SRC = $(BIN).c {peripheral['name']}_$(IF)_csrs.c
 SRC += $(wildcard ../../src/{peripheral['name']}.c)
 HDR += ../drivers/{peripheral['name']}_driver_files.h
+
+CC = riscv64-unknown-linux-gnu-gcc
+# Strip debug symbols to make binary smaller
+STRIP = riscv64-unknown-linux-gnu-strip
+
+
+# Use -Os for smaller size, or -O2 for best performance
 FLAGS = -Wall -Werror -O2
-FLAGS += -static
 FLAGS += -march=rv32imac
 FLAGS += -mabi=ilp32
 FLAGS += -I../drivers -I../../src
 FLAGS += -D$(UPPER_IF)_IF
-BIN = {peripheral['name']}_user
-CC = riscv64-unknown-linux-gnu-gcc
+
+ifeq ($(STATIC), 1)
+	FLAGS += -static
+endif
 
 $(BIN)_$(IF): $(SRC) $(HDR)
 	$(CC) $(FLAGS) $(INCLUDE) -o $(BIN)_$(IF) $(SRC)
+	$(STRIP) --strip-unneeded $(BIN)_$(IF)
 
 all:
 	make IF=sysfs
