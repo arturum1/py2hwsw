@@ -177,6 +177,8 @@ let
     pythonEnv
     (texlive.combine { inherit (texlive) scheme-medium multirow lipsum catchfile nowidow enumitem placeins xltabular ltablex titlesec makecell datetime fmtcount comment textpos csquotes amsmath cancel listings hyperref biblatex pmboxdraw varwidth hanging adjustbox stackengine alphalph; })
     (callPackage ./scripts/riscv-gnu-toolchain.nix { })
+    # pkgsCross.riscv64.buildPackages.gcc # linux: riscv64-unknown-linux-gnu-*
+    # pkgsCross.riscv64-embedded.buildPackages.gcc # newlib: riscv64-none-elf-*
     verible
     black
     llvmPackages_14.clangUseLLVM
