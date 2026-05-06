@@ -27,12 +27,28 @@
 #define FLASH_FIRMWARE_OFFSET 0x1000 // sector 0, subsector 1
 
 // Ethernet utility functions
-void clear_cache() {
-  // Delay to ensure all data is written to memory
-  for (unsigned int i = 0; i < 10; i++)
-    asm volatile("nop");
-  // Flush VexRiscv CPU internal cache
-  asm volatile(".word 0x500F" ::: "memory");
+
+// Assumes 64-byte cache lines (common in VexiiRiscv/VexRiscv); adjust if
+// different
+#define CACHE_LINE_SIZE 64
+
+// Clean and invalidate CPU data cache. Write-back dirty lines to memory and
+// then discard cache contents.
+void flush_cache(void *start, size_t len) {
+  // Vexriscv specific instruction to invalidate CPU data cache (discards dirty
+  // lines) asm volatile(".word 0x500F" ::: "memory");
+
+  char *end = (char *)start + len;
+  char *ptr;
+
+  // Round start down to line boundary
+  ptr = (char *)((uintptr_t)start & ~(CACHE_LINE_SIZE - 1));
+
+  // Flush (clean + invalidate) whole lines covering the range
+  while (ptr < end) {
+    asm volatile("cbo.flush 0(%0)" ::"r"(ptr) : "memory");
+    ptr += CACHE_LINE_SIZE;
+  }
 }
 
 #ifdef IOB_SYSTEM_LINUX_USE_ETHERNET
@@ -282,7 +298,7 @@ int main() {
 
 #ifdef IOB_SYSTEM_LINUX_USE_ETHERNET
   // Init ethernet
-  eth_init(ETH0_BASE, &clear_cache);
+  eth_init(ETH0_BASE, &flush_cache);
   // Wait for PHY reset to finish
   eth_wait_phy_rst();
 #endif // IOB_SYSTEM_LINUX_USE_ETHERNET

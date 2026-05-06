@@ -82,6 +82,8 @@ def generate_dts(dts_parameters):
             status = "okay";
             compatible = "riscv";
             riscv,isa = "rv32imac";
+            // riscv,isa = "rv32imac_zicsr_zifencei_zicbom"; // Supports Zicbom extensions for cache management
+            // riscv,cbom-block-size = <64>; // Define the cache line size (VexiiRiscv default is 64 bytes) - needed for zicbom cache management
             mmu-type = "riscv,sv32";
             d-cache-block-size = <0x40>;
             d-cache-sets = <0x40>;
@@ -116,6 +118,7 @@ def generate_dts(dts_parameters):
         #size-cells = <1>;
         compatible = "iobundle,{dts_parameters['name']}", "simple-bus";
         ranges;
+        //dma-noncoherent; // This tells Linux that every peripheral of this bus that uses DMA needs cache flushes (zicbom extension)
 
         // Peripherals added via #include statements.
         {extra_peripherals}
