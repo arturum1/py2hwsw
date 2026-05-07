@@ -13,6 +13,9 @@
 
 // DMA functions
 
+// Initialize Base Address
+void dma_init(uint32_t addr);
+
 // Start a DMA write transfer
 void dma_write_transfer(uint32_t *base_addr, uint32_t size);
 

@@ -8,6 +8,11 @@
 
 // DMA functions
 
+// Initialize Base Address
+void dma_init(uint32_t addr) {
+  iob_dma_csrs_init_baseaddr(addr);
+}
+
 // Start a DMA write transfer
 // Write to memory
 // base_addr: Base address of external memory to start the data transfer.

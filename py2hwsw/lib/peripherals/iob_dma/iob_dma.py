@@ -93,7 +93,7 @@ def setup(py_params_dict):
             # AXIS Interfaces - without last
             {
                 "name": "dma_input_io",
-                "descr": "",
+                "descr": "Input AXIS interface",
                 "signals": [
                     {"name": "axis_in_tdata_i", "width": "AXI_DATA_W"},
                     {"name": "axis_in_tvalid_i", "width": "1"},
@@ -102,7 +102,7 @@ def setup(py_params_dict):
             },
             {
                 "name": "dma_output_io",
-                "descr": "",
+                "descr": "Output AXIS interface",
                 "signals": [
                     {"name": "axis_out_tdata_o", "width": "AXI_DATA_W"},
                     {"name": "axis_out_tvalid_o", "width": "1"},
@@ -112,6 +112,7 @@ def setup(py_params_dict):
             # AXI Interface
             {
                 "name": "axi_m",
+                "descr": "AXI interface",
                 "signals": {
                     "type": "axi",
                     "ID_W": "AXI_ID_W",
@@ -119,7 +120,6 @@ def setup(py_params_dict):
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                 },
-                "descr": "AXI interface",
             },
         ],
         "wires": [
@@ -545,6 +545,11 @@ def setup(py_params_dict):
                 "core_name": "iob_dma_sim",
                 "dest_dir": "hardware/simulation/src",
                 "csr_if": CSR_IF,
+            },
+        ],
+        "sw_modules": [
+            {
+                "core_name": "iob_linux_device_drivers",
             },
         ],
         "snippets": [
