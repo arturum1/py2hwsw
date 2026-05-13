@@ -110,8 +110,8 @@ def setup(py_params_dict):
                 },
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
-                    "counter_rst_i": "rst_int",
-                    "counter_en_i": "en_int",
+                    "rst_i": "rst_int",
+                    "en_i": "en_int",
                     "data_o": "time_counter",
                 },
             },
