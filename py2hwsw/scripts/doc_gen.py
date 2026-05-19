@@ -11,7 +11,7 @@ import config_gen
 import io_gen
 import block_gen
 
-from latex import write_table
+from latex import write_table, escape_latex
 from iob_base import fail_with_msg, find_path, get_lib_cores
 
 
@@ -26,6 +26,22 @@ def generate_docs(core):
         generate_py_params_tex(
             core.python_parameters, core.build_dir + "/document/tsrc"
         )
+        generate_tex_file(
+            core.build_dir + "/document/tsrc/rn_overview.tex", core.description
+        )
+        generate_tex_file(core.build_dir + "/document/tsrc/name.tex", core.title)
+        generate_tex_file(
+            core.build_dir + "/document/tsrc/description.tex", core.description
+        )
+
+
+def generate_tex_file(file_path, contents):
+    """Generate TeX file with given contents
+    :param str file_path: Path to the file
+    :param str contents: TeX contents
+    """
+    with open(file_path, "w") as f:
+        f.write(escape_latex(contents))
 
 
 def generate_tex_py2hwsw_attributes(iob_core_instance, out_dir):
@@ -64,7 +80,7 @@ def generate_tex_py2hwsw_standard_py_params(out_dir):
         [
             "build_dir",
             str,
-            "Build directory of this core. Usually defined by `--build-dir` flag or instantiator.",
+            "Build directory of this core. Usually defined by `--build-dir` flag or issuer.",
         ],
         [
             "py2hwsw_target",
@@ -72,9 +88,9 @@ def generate_tex_py2hwsw_standard_py_params(out_dir):
             "The reason why py2hwsw is invoked. Usually `setup` meaning the Py2HWSW is calling the core's script to obtain information on how to generate the core. May also be other targets like `clean`, `print_attributes`, or `deliver`. These are usually to obtain information about the core for various purposes, but not to generate the build directory.",
         ],
         [
-            "instantiator",
+            "issuer",
             dict,
-            "Core dictionary with attributes of the instantiator core (if any). Allows subblocks to obtain information about their instantiator core.",
+            "Core dictionary with attributes of the issuer core (if any). Allows subblocks to obtain information about their issuer core.",
         ],
         [
             "py2hwsw_version",
@@ -124,32 +140,34 @@ See the \\textit{Python Parameters} section of the \\href{https://github.com/IOb
     for group in python_parameters:
         py_params_file.write(
             """
-\\begin{table}[H]
-  \\centering
-  \\begin{tabularx}{\\textwidth}{|l|c|X|}
+{
+\\setlength{\\LTcapwidth}{\\linewidth} % make sure the caption takes up the whole linewidth
+\\begin{xltabular}{\\textwidth}{|l|c|X|}
 
-    \\hline
-    \\rowcolor{iob-green}
-    {\\bf Name} & {\\bf Default Value} & {\\bf Description} \\\\ \\hline \\hline
-
-    \\input """
-            + group.name
-            + """_py_params_tab
-
-  \\end{tabularx}
+  \\hline
+  \\rowcolor{iob-green}
+  {\\bf Name} & {\\bf Default Value} & {\\bf Description} \\\\ \\hline \\hline
+  \\endfirsthead
+  \\hline
   \\caption{"""
             + group.descr.replace("_", "\\_")
             + """}
-  \\label{"""
+  \\endlastfoot
+
+  \\input """
+            + group.name
+            + """_py_params_tab
+
+\\end{xltabular}
+\\label{"""
             + group.name
             + """_py_params_tab:is}
-\\end{table}
+}
 """
         )
         if group.doc_clearpage:
             py_params_file.write("\\clearpage")
 
-    py_params_file.write("\\clearpage")
     py_params_file.close()
 
     generate_py_params_tex_table(python_parameters, out_dir)

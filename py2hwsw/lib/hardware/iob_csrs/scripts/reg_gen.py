@@ -34,22 +34,11 @@ def find_obj_in_list(obj_list, obj_name, process_func=lambda o: o):
 
 
 def version_str_to_digits(version_str):
-    """Given a version string (like "V0.12"), return a 4 digit string representing
-    the version (like "0012")"""
+    """Given a version string (like "V0.12.3"), return a 6 digit string representing
+    the version (like "001203")"""
     version_str = version_str.replace("V", "")
-    major_ver, minor_ver = version_str.split(".")
-    return f"{int(major_ver):02d}{int(minor_ver):02d}"
-
-
-def auto_setup_iob_ctls(core):
-    """Auto-add iob_ctls module to subblocks list"""
-    core["subblocks"].append(
-        {
-            "core_name": "iob_ctls",
-            "instance_name": "iob_ctls_inst",
-            "instantiate": False,
-        },
-    )
+    major_ver, minor_ver, patch_ver = version_str.split(".")
+    return f"{int(major_ver):02d}{int(minor_ver):02d}{int(patch_ver):02d}"
 
 
 def build_regs_table(core):
@@ -72,13 +61,12 @@ def build_regs_table(core):
         general_regs_table.regs.append(
             iob_csr(
                 name="version",
-                type="R",
-                n_bits=16,
+                mode="R",
+                n_bits=24,
                 rst_val=version_str_to_digits(core["version"]),
                 addr=-1,
                 log2n_items=0,
-                autoreg=True,
-                descr="Product version. This 16-bit register uses nibbles to represent decimal numbers using their binary values. The two most significant nibbles represent the integral part of the version, and the two least significant nibbles represent the decimal part. For example V12.34 is represented by 0x1234.",
+                descr="Product version in SemVer format. This 24-bit register uses nibbles to represent decimal numbers using their binary values. The two most significant nibbles represent the major part of the version, followed by two nibbles that represent the minor part. The two least significant nibbles represent the patch version. For example V12.34.56 is represented by 0x123456.",
                 volatile=False,
             )
         )
@@ -98,9 +86,6 @@ def build_regs_table(core):
 def generate_csr_hw(core, csr_gen_obj, reg_table):
     """Generate reg hardware files"""
     name = core["name"]
-    csr_gen_obj.write_hwheader(
-        reg_table, core["build_dir"] + "/" + core["dest_dir"], name
-    )
     csr_gen_obj.write_hwcode(
         reg_table,
         core,
@@ -125,5 +110,8 @@ def generate_csr(core, create_files=True):
     if create_files:
         generate_csr_hw(core, csr_gen_obj, reg_table)
         generate_csr_sw(core, csr_gen_obj, reg_table)
-    auto_setup_iob_ctls(core)
+
+    # Append macros for each CSR
+    csr_gen_obj.generate_csr_macros(core, reg_table)
+
     return csr_gen_obj, reg_table

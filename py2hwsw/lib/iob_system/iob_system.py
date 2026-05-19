@@ -11,23 +11,35 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "script
 from iob_system_utils import convert_params_dict, update_params, iob_system_scripts
 
 
-def setup(py_params_dict):
+def setup(py_params: dict):
+    # Dictionary of available python parameters for iob_system
+    # Format: [parameter name]: ([parameter default value], [parameter description])
     params = {
         "name": ("iob_system", "Name of the generated System"),
         "init_mem": (True, "If should initialize memories from data in .hex files"),
-        "use_intmem": (True, "If should include an internal memory"),
+        "use_intmem": (
+            True,
+            "If should include an internal memory (in memory wrapper).",
+        ),
         "use_extmem": (False, "If should use external memory (usually DDR)"),
         "use_bootrom": (True, "If should include a bootrom"),
         "use_peripherals": (True, "If should include peripherals"),
-        "use_ethernet": (False, "If should setup ethernet ports and testbenches"),
+        "use_ethernet": (
+            False,
+            "If should include ethernet peripheral, MII interface, and testbenches with ethernet support.",
+        ),
         "addr_w": (32, "CPU address width"),
         "data_w": (32, "CPU data width"),
-        "mem_addr_w": (18, "Memory address width"),
+        "mem_addr_w": (
+            15,
+            "Internal memory address width. Also specifies default value for external memory address width.",
+        ),
         "bootrom_addr_w": (12, "Bootrom address width"),
         "fw_baseaddr": (0, "Firmware base address"),
-        "fw_addr_w": (18, "Firmware address width"),
+        "fw_addr_w": (15, "Firmware address width"),
         "include_tester": (True, "If should include a tester system"),
         "include_snippet": (True, "If should include default system snippet"),
+        # See notes at the end of this file for more info about custom CPU integration and available CPUs
         "cpu": (
             "iob_vexriscv",
             """CPU selection.
@@ -39,7 +51,7 @@ def setup(py_params_dict):
         be the peripheral memory region. If set to "false", the user must define the uncached memory region."""),
         "system_attributes": (
             {},
-            "Core dictionary with attributes to override/append to the ones of iob_system. Usually passed by child cores to add their own components.",
+            "Core dictionary with attributes to override/append to the ones of iob_system. Usually passed by derived cores to add their own components.",
         ),
     }
 
@@ -48,12 +60,18 @@ def setup(py_params_dict):
     python_parameters_attribute = convert_params_dict(params)
 
     # Update parameters values with ones given in python parameters
-    update_params(params, py_params_dict)
+    update_params(params, py_params)
+
+    sw_trap_fenci = True
 
     if params["cpu"] == "none":
         params["use_intmem"] = False
         params["use_extmem"] = False
         params["use_bootrom"] = False
+
+    # Disable software trap handler and fence.i for uncompatible CPUs
+    if params["cpu"] == "iob_picorv32":
+        sw_trap_fenci = False
 
     num_xbar_managers = 0
     for param_name in ["use_intmem", "use_extmem", "use_bootrom", "use_peripherals"]:
@@ -61,12 +79,24 @@ def setup(py_params_dict):
             num_xbar_managers += 1
     xbar_sel_w = (num_xbar_managers - 1).bit_length()
 
+    # Create list of interrupt signals
+    interrupt_signals = ["timer0_interrupt"]
+    if params["use_ethernet"]:
+        interrupt_signals += ["eth0_interrupt"]
+
     attributes_dict = {
         "name": params["name"],
         "generate_hw": True,
         "is_system": True,
-        "board_list": ["iob_aes_ku040_db_g"],
+        "board_list": [
+            "iob_aes_ku040_db_g",
+            "iob_zybo_z7",
+            "iob_smart_zynq_sl",
+            "iob_cyclonev_gt_dk",
+        ],
         "python_parameters": python_parameters_attribute,
+        "title": "IOb-System",
+        "description": "System-on-Chip (SoC) template",
         "confs": [
             # macros
             {  # Needed for testbench
@@ -119,7 +149,7 @@ def setup(py_params_dict):
             },
             {  # Needed for software and makefiles
                 "name": "MEM_ADDR_W",
-                "descr": "External memory bus address width.",
+                "descr": "Internal memory bus address width.",
                 "type": "M",
                 "val": params["mem_addr_w"],
                 "min": "0",
@@ -157,7 +187,23 @@ def setup(py_params_dict):
                 "min": "1",
                 "max": "32",
             },
-            # mandatory parameters (do not change them!)
+            {  # Needed for software
+                "name": "TRAP_HANDLER",
+                "descr": "Enable trap handler in software using mtvec CSR. Only enable this for compatible CPUs. PicoRV32 not compatible.",
+                "type": "M",
+                "val": sw_trap_fenci,
+                "min": "0",
+                "max": "1",
+            },
+            {  # Needed for software
+                "name": "FENCEI",
+                "descr": "Enable 'FENCE.I' instruction from the RISC-V 'Zifencei' extension. Only enable this for compatible CPUs. PicoRV32 not compatible.",
+                "type": "M",
+                "val": sw_trap_fenci,
+                "min": "0",
+                "max": "1",
+            },
+            # Parameters
             {
                 "name": "AXI_ID_W",
                 "descr": "AXI ID bus width",
@@ -190,6 +236,20 @@ def setup(py_params_dict):
                 "min": "1",
                 "max": "4",
             },
+            {
+                "name": "SIMULATION",
+                "descr": "Enable simulation optimizations. For example, lower ethernet PHY_RST_CNT value.",
+                "type": "P",
+                "val": "0",
+            },
+            #
+            # False-parameters
+            #
+            {
+                "name": "ETH_PHY_RST_CNT",
+                "type": "D",
+                "val": "(SIMULATION ? 20'h00100 : 20'hFFFFF)",
+            },
             #
             # False-parameters for generated memories
             #
@@ -204,10 +264,12 @@ def setup(py_params_dict):
             },
             # INTERNAL MEMORY
             {
-                "name": "EXT_MEM_HEXFILE",
+                "name": "INT_MEM_HEXFILE",
                 "descr": "Firmware file name",
                 "type": "D",
-                "val": f'"{params["name"]}_firmware"',
+                "val": (
+                    f'"{params["name"]}_firmware"' if params["init_mem"] else '"none"'
+                ),
                 "min": "NA",
                 "max": "NA",
             },
@@ -238,11 +300,11 @@ def setup(py_params_dict):
     if params["use_intmem"]:
         attributes_dict["ports"] += [
             {
-                "name": "external_mem_bus_m",
-                "descr": "Port for connection to external 'iob_ram_t2p_be' memory",
+                "name": "int_mem_bus_m",
+                "descr": "Port for connection to 'iob_ram_t2p_be' memory",
                 "signals": {
                     "type": "ram_t2p_be",
-                    "prefix": "ext_mem_",
+                    "prefix": "int_mem_",
                     "ADDR_W": params["mem_addr_w"] - 2,
                     "DATA_W": params["data_w"],
                 },
@@ -256,7 +318,7 @@ def setup(py_params_dict):
                 "signals": {
                     "type": "axi",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": "AXI_ADDR_W-2",
+                    "ADDR_W": "AXI_ADDR_W",
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                     "LOCK_W": 1,
@@ -275,6 +337,27 @@ def setup(py_params_dict):
             },
             # NOTE: Add ports for peripherals here
         ]
+        if params["use_ethernet"]:
+            attributes_dict["ports"] += [
+                {
+                    "name": "phy_rstn_o",
+                    "descr": "",
+                    "signals": [
+                        {
+                            "name": "phy_rstn_o",
+                            "width": "1",
+                            "descr": "Ethernet reset signal for PHY.",
+                        },
+                    ],
+                },
+                {
+                    "name": "mii_io",
+                    "descr": "Ethernet MII interface",
+                    "signals": {
+                        "type": "mii",
+                    },
+                },
+            ]
     if params["cpu"] == "none":
         attributes_dict["ports"] += [
             {
@@ -282,7 +365,7 @@ def setup(py_params_dict):
                 "descr": "IOb subordinate interface for external CPU. Gives direct access to system peripherals",
                 "signals": {
                     "type": "iob",
-                    "ADDR_W": "AXI_ADDR_W-2",
+                    "ADDR_W": "AXI_ADDR_W",
                     "DATA_W": "AXI_DATA_W",
                 },
             },
@@ -321,7 +404,7 @@ def setup(py_params_dict):
                     "type": "axi",
                     "prefix": "cpu_i_",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": params["addr_w"] - 2,
+                    "ADDR_W": params["addr_w"],
                     "DATA_W": params["data_w"],
                     "LEN_W": "AXI_LEN_W",
                     "LOCK_W": "1",
@@ -334,11 +417,48 @@ def setup(py_params_dict):
                     "type": "axi",
                     "prefix": "cpu_d_",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": params["addr_w"] - 2,
+                    "ADDR_W": params["addr_w"],
                     "DATA_W": params["data_w"],
                     "LEN_W": "AXI_LEN_W",
                     "LOCK_W": "1",
                 },
+            },
+            {
+                "name": "riscv_interrupts",
+                "descr": "Standard RISC‑V interrupt pending bits",
+                "signals": [
+                    {
+                        "name": "riscv_msip",
+                        "descr": "Machine software interrupt.",
+                        "width": "1",
+                    },
+                    {
+                        "name": "riscv_mtip",
+                        "descr": "Machine timer interrupt.",
+                        "width": "1",
+                    },
+                    {
+                        "name": "riscv_meip",
+                        "descr": "Machine external interrupt.",
+                        "width": "1",
+                    },
+                    {
+                        "name": "riscv_seip",
+                        "descr": "Supervisor external interrupt.",
+                        "width": "1",
+                    },
+                ],
+            },
+            {
+                "name": "riscv_timebase",
+                "descr": "Timebase interface",
+                "signals": [
+                    {
+                        "name": "riscv_mtime",
+                        "descr": "Input from external 64-bit counter for time CSRs",
+                        "width": "64",
+                    },
+                ],
             },
             {
                 "name": "unused_interconnect_bits",
@@ -382,7 +502,7 @@ def setup(py_params_dict):
                     "type": "axi",
                     "prefix": "int_mem_",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": f"{params['mem_addr_w']}-2",
+                    "ADDR_W": f"{params['mem_addr_w']}",
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                     "LOCK_W": 1,
@@ -398,8 +518,7 @@ def setup(py_params_dict):
                     "type": "axi",
                     "prefix": "bootrom_",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": (params["bootrom_addr_w"] + 1)
-                    - 2,  # +1 for csrs; -2 for lsbs
+                    "ADDR_W": params["bootrom_addr_w"] + 1,  # +1 for csrs
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                     "LOCK_W": "1",
@@ -415,7 +534,7 @@ def setup(py_params_dict):
                     "type": "axi",
                     "prefix": "periphs_",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": params["addr_w"] - 2 - xbar_sel_w,
+                    "ADDR_W": params["addr_w"] - xbar_sel_w,
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                 },
@@ -437,14 +556,69 @@ def setup(py_params_dict):
                     "type": "iob",
                     "prefix": "periphs_",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": params["addr_w"] - 2 - xbar_sel_w,
+                    "ADDR_W": params["addr_w"] - xbar_sel_w,
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                 },
             },
             # Peripheral cbus wires added automatically
+            {
+                "name": "plic_interrupts",
+                "descr": "Connect PLIC interrupts to CPU",
+                "signals": [
+                    {"name": "riscv_meip"},
+                    {"name": "riscv_seip"},
+                ],
+            },
+            {
+                "name": "clint_rt_clk",
+                "descr": "CLINT real time clock",
+                "signals": [
+                    {
+                        "name": "rt_clk",
+                        "descr": "Real Time clock input if available (usually 32.768 kHz)",
+                        "width": "1",
+                    },
+                ],
+            },
+            {
+                "name": "clint_interrupts",
+                "descr": "Connect CLINT interrupts to CPU",
+                "signals": [
+                    {"name": "riscv_mtip"},
+                    {"name": "riscv_msip"},
+                ],
+            },
             # NOTE: Add other peripheral wires here
         ]
+        if params["use_ethernet"]:
+            attributes_dict["wires"] += [
+                {
+                    "name": "eth_axi",
+                    "descr": "AXI bus for ethernet DMA",
+                    "signals": {
+                        "type": "axi",
+                        "prefix": "eth_",
+                        "ID_W": "AXI_ID_W",
+                        "ADDR_W": params["addr_w"],
+                        "DATA_W": "AXI_DATA_W",
+                        "LEN_W": "AXI_LEN_W",
+                        "LOCK_W": "2",
+                    },
+                },
+            ]
+    # Generate interrupt wires for each signal defined in 'interrupt_signals' list
+    for interrupt_signal in interrupt_signals:
+        attributes_dict["wires"] += [
+            {
+                "name": interrupt_signal,
+                "descr": "Interrupt signal",
+                "signals": [
+                    {"name": interrupt_signal, "width": 1},
+                ],
+            },
+        ]
+
     attributes_dict["subblocks"] = []
     if params["cpu"] != "none":
         attributes_dict["subblocks"] += [
@@ -484,15 +658,8 @@ def setup(py_params_dict):
                             "cpu_d_axi_bid[0]",
                         ],
                     ),
-                    "plic_interrupts_i": "interrupts",
-                    "plic_cbus_s": (
-                        "plic_cbus",
-                        ["plic_cbus_iob_addr[22-2-1:0]"],
-                    ),
-                    "clint_cbus_s": (
-                        "clint_cbus",
-                        ["clint_cbus_iob_addr[16-2-1:0]"],
-                    ),
+                    "interrupt_i": "riscv_interrupts",
+                    "timebase_i": "riscv_timebase",
                 },
             },
             {
@@ -511,7 +678,7 @@ def setup(py_params_dict):
                     "s1_axi_s": "cpu_dbus",
                     # Manager interfaces connected below
                 },
-                "addr_w": params["addr_w"] - 2,
+                "addr_w": params["addr_w"],
                 "data_w": params["data_w"],
                 "lock_w": 1,
                 "num_subordinates": 2,
@@ -558,6 +725,16 @@ def setup(py_params_dict):
                 }
                 num_managers += 1
         attributes_dict["subblocks"][-1]["num_managers"] = num_managers
+        # Connect ethernet to xbar subordinate interfaces
+        if params["use_ethernet"]:
+            subordinate_if_number = attributes_dict["subblocks"][-1]["num_subordinates"]
+            attributes_dict["subblocks"][-1]["num_subordinates"] += 1
+            attributes_dict["subblocks"][-1]["connect"] |= {
+                f"s{subordinate_if_number}_axi_s": (
+                    "eth_axi",
+                    ["eth_axi_awlock[0]", "eth_axi_arlock[0]"],
+                )
+            }
 
     if params["use_intmem"]:
         attributes_dict["subblocks"] += [
@@ -577,13 +754,11 @@ def setup(py_params_dict):
                     "axi_s": (
                         "int_mem_axi",
                         [
-                            "{int_mem_axi_araddr, 2'b0}",
-                            "{int_mem_axi_awaddr, 2'b0}",
                             "{1'b0, int_mem_axi_arlock}",
                             "{1'b0, int_mem_axi_awlock}",
                         ],
                     ),
-                    "external_mem_bus_m": "external_mem_bus_m",
+                    "external_mem_bus_m": "int_mem_bus_m",
                 },
             },
         ]
@@ -599,14 +774,14 @@ def setup(py_params_dict):
                 },
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
-                    "iob_csrs_cbus_s": (
+                    "csrs_cbus_s": (
                         "bootrom_cbus",
                         [
                             "{1'b0, bootrom_axi_arlock}",
                             "{1'b0, bootrom_axi_awlock}",
                         ],
                     ),
-                    "ext_rom_bus_m": "rom_bus_m",
+                    "rom_bus_m": "rom_bus_m",
                 },
                 "bootrom_addr_w": params["bootrom_addr_w"],
                 "soc_name": params["name"],
@@ -617,11 +792,11 @@ def setup(py_params_dict):
             {
                 "core_name": "iob_axi2iob",
                 "instance_name": "periphs_axi2iob",
-                "instance_description": "Convert AXI to AXI lite for CLINT",
+                "instance_description": "Convert AXI to IOb for peripherals",
                 "parameters": {
                     "AXI_ID_WIDTH": "AXI_ID_W",
                     "AXI_LEN_WIDTH": "AXI_LEN_W",
-                    "ADDR_WIDTH": params["addr_w"] - 2 - xbar_sel_w,
+                    "ADDR_WIDTH": params["addr_w"] - xbar_sel_w,
                     "DATA_WIDTH": "AXI_DATA_W",
                 },
                 "connect": {
@@ -647,13 +822,11 @@ def setup(py_params_dict):
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
                     "reset_i": "split_reset",
-                    "input_s": (
-                        "iob_periphs_cbus" if params["cpu"] != "none" else "iob_s"
-                    ),
+                    "s_s": ("iob_periphs_cbus" if params["cpu"] != "none" else "iob_s"),
                     # Peripherals cbus connections added automatically
                 },
-                "num_outputs": 0,  # Num outputs configured automatically
-                "addr_w": params["addr_w"] - 2 - xbar_sel_w,
+                "num_managers": 0,  # Num managers configured automatically
+                "addr_w": params["addr_w"] - xbar_sel_w,
             },
             # Peripherals
             {
@@ -678,10 +851,64 @@ def setup(py_params_dict):
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
                     # Cbus connected automatically
+                    "interrupt_o": "timer0_interrupt",
+                },
+                "plic_source_id": 1,
+            },
+            {
+                "core_name": "iob_plic",
+                "instance_name": "PLIC0",
+                "instance_description": "RISC-V PLIC peripheral",
+                "is_peripheral": True,
+                "connect": {
+                    "clk_en_rst_s": "clk_en_rst_s",
+                    # Cbus connected automatically
+                    "interrupt_i": "interrupts",
+                    "interrupt_o": "plic_interrupts",
+                },
+            },
+            {
+                "core_name": "iob_clint",
+                "instance_name": "CLINT0",
+                "instance_description": "RISC-V CLINT peripheral",
+                "is_peripheral": True,
+                "parameters": {
+                    "N_CORES": 1,
+                },
+                "connect": {
+                    "clk_en_rst_s": "clk_en_rst_s",
+                    # Cbus connected automatically
+                    "rt_clk_i": "clint_rt_clk",
+                    "interrupt_o": "clint_interrupts",
+                    "timebase_o": "riscv_timebase",
                 },
             },
             # NOTE: Instantiate other peripherals here, using the 'is_peripheral' flag
         ]
+        if params["use_ethernet"]:
+            attributes_dict["subblocks"] += [
+                {
+                    "core_name": "iob_eth",
+                    "instance_name": "ETH0",
+                    "instance_description": "Ethernet interface",
+                    "is_peripheral": True,
+                    "parameters": {
+                        "AXI_ID_W": "AXI_ID_W",
+                        "AXI_LEN_W": "AXI_LEN_W",
+                        "AXI_ADDR_W": params["addr_w"],
+                        "AXI_DATA_W": params["data_w"],
+                        "DATA_W": params["data_w"],
+                        "PHY_RST_CNT": "ETH_PHY_RST_CNT",
+                    },
+                    "connect": {
+                        "clk_en_rst_s": "clk_en_rst_s",
+                        "axi_m": "eth_axi",
+                        "inta_o": "eth0_interrupt",
+                        "phy_rstn_o": "phy_rstn_o",
+                        "mii_io": "mii_io",
+                    },
+                },
+            ]
     attributes_dict["superblocks"] = [
         # Synthesis module (needed for macros)
         {
@@ -708,15 +935,15 @@ def setup(py_params_dict):
                 "iob_system_params": params,
                 "dest_dir": "tester",
             },
-            # Create second tester but without CPU
-            # This Tester's verification instruments will be controlled by testbench
-            {
-                "core_name": "iob_system_tester",
-                "instance_name": "iob_system_tester_no_cpu",
-                "cpu": "none",
-                "iob_system_params": params,
-                "dest_dir": "tester_no_cpu",
-            },
+            # # Create second tester but without CPU
+            # # This Tester's verification instruments will be controlled by testbench
+            # {
+            #     "core_name": "iob_system_tester",
+            #     "instance_name": "iob_system_tester_no_cpu",
+            #     "cpu": "none",
+            #     "iob_system_params": params,
+            #     "dest_dir": "tester_no_cpu",
+            # },
         ]
     attributes_dict["sw_modules"] = [
         # Software modules
@@ -727,16 +954,49 @@ def setup(py_params_dict):
     ]
 
     attributes_dict["snippets"] = []
+
     if params["include_snippet"]:
+        # Calculate unused interrupts, and generate interrupts snippet
+        num_unused_interrupts = 31 - len(interrupt_signals)
+        interrupt_signals_str = ""
+        if len(interrupt_signals) > 0:
+            interrupt_signals_str = ",".join(interrupt_signals) + ","
+
         attributes_dict["snippets"] += [
             {
-                "verilog_code": """
-   //assign interrupts = {{30{1'b0}}, uart_interrupt_o, 1'b0};
-   assign interrupts = {{30{1'b0}}, 1'b0, 1'b0};
+                "verilog_code": f"""
+   assign interrupts = {{{{{num_unused_interrupts}{{1'b0}}}}, {interrupt_signals_str} 1'b0}};
 """
             }
         ]
 
-    iob_system_scripts(attributes_dict, params, py_params_dict)
+    iob_system_scripts(attributes_dict, params, py_params)
 
     return attributes_dict
+
+
+"""
+Notes about CPU integration:
+
+By default, iob_system uses the VexRiscv CPU
+In order to integrate new CPUs seamlessly with iob_system, the CPU interfaces should match the ones expected by the iob_system. This way we can easily switch the CPU's instance while maintaining the same connections and remaining system parameters.
+
+To adapt an existing CPU for compatibility with iob_system, we may create a wrapper module over the existing CPU, containing the expected interfaces, and any required interface conversion modules.
+
+The iob_vexriscv module, also included in the Py2HWSW's library, is a wrapper of the VexRiscv CPU that already contains the interfaces expected by iob_system. These interfaces are the ones specified in the ports list of the iob_vexriscv CPU wrapper: https://github.com/IObundle/iob-vexriscv/blob/main/iob_vexriscv.py#L63-L135
+
+In order to provide more CPU options, we have created the following CPU wrappers, making them compatible with iob_system:
+
+The VexRiscv CPU compatible with iob_system is available at: https://github.com/IObundle/iob-vexriscv
+The Picorv32 CPU compatible with iob_system is available at: https://github.com/IObundle/iob-picorv32
+The VexiiRiscv CPU compatible with iob_system is available at: https://github.com/IObundle/iob-vexiiriscv
+
+To switch between CPUs, iob_system supports the `cpu` python parameter.
+The user may change this parameter's value to any of the supported CPUs.
+
+Other untested/WIP compatible CPUs:
+The untested NaxRiscv CPU compatible with iob_system is available at: https://github.com/IObundle/iob-naxriscv
+The untested Ibex CPU compatible with iob_system is available at: https://github.com/IObundle/iob-ibex
+
+These untested CPUs are not included in the Py2HWSW library. To use them, include them as git submodules of your project.
+"""

@@ -65,7 +65,10 @@ void iob_hard_reset() {
   dut->clk_i = 1;
   dut->cke_i = 0;
   dut->arst_i = 0;
-  clk_tick(100);
+  clk_tick(50);
+  dut->cke_i = 1;
+  clk_tick(50);
+  dut->cke_i = 0;
   dut->arst_i = 1;
   clk_tick(100);
   dut->arst_i = 0;
@@ -94,6 +97,7 @@ void iob_write(unsigned int address, unsigned data_w, unsigned int data) {
     dut->iob_wdata_i = data;
     break;
   }
+  dut->eval(); // Some cores may change ready when they receive valid
   while (dut->iob_ready_o == 0) {
     clk_tick();
   }
@@ -110,12 +114,12 @@ unsigned int iob_read(unsigned int address, unsigned int data_w) {
 
   dut->iob_addr_i = address; // remove byte address
   dut->iob_valid_i = 1;
+  dut->eval(); // Some cores may change ready when they receive valid
   while (dut->iob_ready_o == 0) {
     clk_tick();
   }
   clk_tick();
   dut->iob_valid_i = 0;
-  dut->iob_rready_i = 1;
   while (dut->iob_rvalid_o == 0) {
     clk_tick();
   }
@@ -131,7 +135,6 @@ unsigned int iob_read(unsigned int address, unsigned int data_w) {
     break;
   }
   clk_tick();
-  dut->iob_rready_i = 0;
   return data;
 }
 
@@ -169,6 +172,13 @@ int main(int argc, char **argv) {
   tfp->close(); // Close tracing file
   fprintf(stdout, "Trace file created: uut.vcd\n");
   delete tfp;
+#endif
+
+  // Coverage analysis
+#if VM_COVERAGE
+  // empty write() argument uses +verilator+coverage+file+[name] from args
+  // default: coverage.dat
+  Verilated::threadContextp()->coveragep()->write();
 #endif
 
   delete dut;

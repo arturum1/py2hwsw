@@ -11,6 +11,7 @@ export SYNTHESIZER ?= yosys
 export BOARD ?= iob_cyclonev_gt_dk
 export LINTER ?= spyglass
 
+ROOT_DIR :=.
 include config_build.mk
 
 SIM_DIR := hardware/simulation
@@ -19,6 +20,9 @@ SYN_DIR=hardware/syn
 
 ifeq (fpga,$(findstring fpga,$(MAKECMDGOALS)))
   USE_FPGA = 1
+ifeq ($(BOARD_DIR),)
+  $(error ERROR: Board directory for board '$(BOARD)' not found under hardware/fpga/! Is the board name correct? )
+endif
 endif
 
 # 
@@ -102,13 +106,13 @@ sim-cov: sim-clean
 #
 FPGA_DIR=hardware/fpga
 fpga-build:
-	make -C $(FPGA_DIR) -j1 build
+	make -C $(FPGA_DIR) -j1 build USE_FPGA=$(USE_FPGA)
 
 fpga-run:
-	make -C $(FPGA_DIR) -j1 run
+	make -C $(FPGA_DIR) -j1 run USE_FPGA=$(USE_FPGA)
 
 fpga-test:
-	make -C $(FPGA_DIR) test
+	make -C $(FPGA_DIR) test USE_FPGA=$(USE_FPGA)
 
 fpga-debug:
 	echo "BOARD=$(BOARD)"

@@ -28,7 +28,7 @@ def setup(py_params_dict):
             },
             {
                 "name": "READ_BYTES",
-                "descr": "",
+                "descr": "Controls how many consecutive bytes the bridge will request from the Wishbone bus for a read. It builds a byte-select mask (wb_select) of length READ_BYTES and shifts it according to the low address bits so the read is aligned to the requested byte offset.",
                 "type": "P",
                 "val": "4",
                 "min": "NA",
@@ -157,21 +157,6 @@ def setup(py_params_dict):
                 "descr": "wb_data output wire",
                 "signals": [
                     {"name": "wb_data_r", "width": "DATA_W"},
-                ],
-            },
-            # Reg wb_ack
-            {
-                "name": "wb_ack_data_i",
-                "descr": "wb_ack intput wire",
-                "signals": [
-                    {"name": "wb_ack_i"},
-                ],
-            },
-            {
-                "name": "wb_ack_data_o",
-                "descr": "wb_ack output wire",
-                "signals": [
-                    {"name": "wb_ack_r", "width": 1},
                 ],
             },
         ],
@@ -307,28 +292,6 @@ def setup(py_params_dict):
                 "data_o": "wb_data_data_o",
             },
         },
-        {
-            "core_name": "iob_reg",
-            "instance_name": "iob_reg_wb_ack",
-            "parameters": {
-                "DATA_W": 1,
-                "RST_VAL": 0,
-            },
-            "port_params": {
-                "clk_en_rst_s": "c_a_r_e",
-            },
-            "connect": {
-                "clk_en_rst_s": (
-                    "clk_en_rst_s",
-                    [
-                        "en_i:wb_ack_i",
-                        "rst_i:iob_rready_i",
-                    ],
-                ),
-                "data_i": "wb_ack_data_i",
-                "data_o": "wb_ack_data_o",
-            },
-        },
     ]
     #
     # Snippets
@@ -336,6 +299,7 @@ def setup(py_params_dict):
     attributes_dict["snippets"] = [
         {
             "verilog_code": """
+
    // Logic
    assign wb_adr_o     = iob_valid_i ? iob_addr_i : iob_address_r;
    assign wb_cyc_o     = iob_valid_i ? iob_valid_i : iob_valid_r;
@@ -344,14 +308,32 @@ def setup(py_params_dict):
    assign wb_sel_o     = iob_valid_i ? wb_select : wb_select_r;
    assign wb_we_o      = iob_valid_i ? wb_we : wb_we_r;
 
-   assign wb_select    = wb_we ? iob_wstrb_i : {READ_BYTES{1'b1}};
+   generate
+       if (READ_BYTES >= (DATA_W/8)) begin : gen_pad_read_bytes
+           localparam RB_MASK = {READ_BYTES{1'b1}};
+           assign wb_select   = wb_we ? iob_wstrb_i : (RB_MASK) << (iob_addr_i[1:0]);
+       end else begin : gen_read_bytes
+           localparam RB_MASK = {{(DATA_W/8-READ_BYTES){1'b0}}, {READ_BYTES{1'b1}}};
+           assign wb_select   = wb_we ? iob_wstrb_i : (RB_MASK) << (iob_addr_i[1:0]);
+       end
+   endgenerate
    assign wb_we        = |iob_wstrb_i;
 
-   assign iob_rvalid_o = wb_ack_i ? wb_ack_i & (~wb_we_r) : wb_ack_r & (~wb_we_r);
    assign iob_rdata_o  = wb_ack_i ? wb_dat_i : wb_data_r;
    assign iob_ready_o  = wb_ack_i;
 """,
         },
     ]
+    #
+    # Combs
+    #
+    attributes_dict["comb"] = {
+        "code": """
+    // Set rvalid on next cycle if read successful
+    iob_rvalid_o_en = iob_valid_i & iob_ready_o & (~wb_we_r);
+    iob_rvalid_o_rst = iob_rvalid_o; // Enable for one clock cycle
+    iob_rvalid_o_nxt = 1'b1;
+"""
+    }
 
     return attributes_dict

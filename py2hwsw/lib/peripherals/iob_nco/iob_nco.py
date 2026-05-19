@@ -16,6 +16,15 @@ def setup(py_params_dict):
                 "max": "32",
                 "descr": "Data bus width",
             },
+            # Derived Parameters
+            {
+                "name": "STRB_W",
+                "type": "D",
+                "val": "DATA_W / 8",
+                "min": "1",
+                "max": "32",
+                "descr": "Width of write strobe",
+            },
             {
                 "name": "PERIOD_W",
                 "type": "D",
@@ -88,8 +97,9 @@ def setup(py_params_dict):
                 "name": "period_int",
                 "descr": "",
                 "signals": [
+                    {"name": "period_int_valid_wr", "width": 1},
                     {"name": "period_int_wdata_wr", "width": 32},
-                    {"name": "period_int_wen_wr", "width": 1},
+                    {"name": "period_int_wstrb_wr", "width": "STRB_W"},
                     {"name": "period_int_ready_wr", "width": 1},
                 ],
             },
@@ -97,8 +107,9 @@ def setup(py_params_dict):
                 "name": "period_frac",
                 "descr": "",
                 "signals": [
+                    {"name": "period_frac_valid_wr", "width": 1},
                     {"name": "period_frac_wdata_wr", "width": 32},
-                    {"name": "period_frac_wen_wr", "width": 1},
+                    {"name": "period_frac_wstrb_wr", "width": "STRB_W"},
                     {"name": "period_frac_ready_wr", "width": 1},
                 ],
             },
@@ -106,7 +117,7 @@ def setup(py_params_dict):
         "subblocks": [
             {
                 "core_name": "iob_csrs",
-                "instance_name": "iob_csrs",
+                "instance_name": "csrs",
                 "instance_description": "Control/Status Registers",
                 "csrs": [
                     {
@@ -115,38 +126,36 @@ def setup(py_params_dict):
                         "regs": [
                             {
                                 "name": "soft_reset",
-                                "type": "W",
+                                "mode": "W",
                                 "n_bits": 1,
                                 "rst_val": 0,
                                 "log2n_items": 0,
-                                "autoreg": True,
                                 "descr": "Soft reset.",
                             },
                             {
                                 "name": "enable",
-                                "type": "W",
+                                "mode": "W",
                                 "n_bits": 1,
                                 "rst_val": 0,
                                 "log2n_items": 0,
-                                "autoreg": True,
                                 "descr": "NCO enable",
                             },
                             {
                                 "name": "period_int",
-                                "type": "W",
+                                "type": "NOAUTO",
+                                "mode": "W",
                                 "n_bits": 32,
                                 "rst_val": 5,
                                 "log2n_items": 0,
-                                "autoreg": False,
                                 "descr": "Integer part of the generated period. Period of the generated clock in terms of the number of system clock cycles + 1 implicit clock cycle. NOTE: need to write to both PERIOD_INT, PERIOD_FRAC registers to set internal period.",
                             },
                             {
                                 "name": "period_frac",
-                                "type": "W",
+                                "type": "NOAUTO",
+                                "mode": "W",
                                 "n_bits": 32,
                                 "rst_val": 0,
                                 "log2n_items": 0,
-                                "autoreg": False,
                                 "descr": "Fractional part of the generated period. NOTE: need to write to both PERIOD_INT, PERIOD_FRAC registers to set internal period.",
                             },
                         ],
@@ -161,14 +170,6 @@ def setup(py_params_dict):
                     "period_int_io": "period_int",
                     "period_frac_io": "period_frac",
                 },
-            },
-            {
-                "core_name": "iob_acc_ld",
-                "instantiate": False,
-            },
-            {
-                "core_name": "iob_modcnt",
-                "instantiate": False,
             },
             {
                 "core_name": "iob_nco_sync",
@@ -190,7 +191,7 @@ def setup(py_params_dict):
                 "instantiate": False,
             },
             {
-                "core_name": "iob_regfile_at2p",
+                "core_name": "iob_regarray_at2p",
                 "instantiate": False,
             },
             # For simulation

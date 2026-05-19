@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+import os
+
 
 def setup(py_params_dict):
     params = py_params_dict["iob_system_params"]
@@ -115,8 +117,8 @@ def setup(py_params_dict):
     if params["use_ethernet"]:
         attributes_dict["ports"] += [
             {
-                "name": "mii_io",
-                "descr": "MII ethernet interface",
+                "name": "phy_io",
+                "descr": "MII ethernet interface + PHY signals",
                 "signals": [
                     {"name": "enet_resetn_o", "width": "1"},
                     {"name": "enet_rx_clk_i", "width": "1"},
@@ -195,7 +197,7 @@ def setup(py_params_dict):
                 "signals": {
                     "type": "axi",
                     "ID_W": "AXI_ID_W",
-                    "ADDR_W": "AXI_ADDR_W - 2",
+                    "ADDR_W": "AXI_ADDR_W",
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                 },
@@ -242,23 +244,22 @@ def setup(py_params_dict):
                 ],
             },
             {
-                "name": "phy",
-                "descr": "PHY Interface Ports",
+                "name": "phy_rstn",
+                "descr": "",
                 "signals": [
-                    {"name": "eth_MTxClk", "width": "1"},
-                    {"name": "MTxEn", "width": "1"},
-                    {"name": "MTxD", "width": "4"},
-                    {"name": "MTxErr", "width": "1"},
-                    {"name": "eth_MRxClk", "width": "1"},
-                    {"name": "MRxDv", "width": "1"},
-                    {"name": "MRxD", "width": "4"},
-                    {"name": "MRxErr", "width": "1"},
-                    {"name": "eth_MColl", "width": "1"},
-                    {"name": "eth_MCrS", "width": "1"},
-                    {"name": "MDC", "width": "1"},
-                    {"name": "MDIO", "width": "1"},
-                    {"name": "phy_rstn", "width": "1"},
+                    {
+                        "name": "phy_rstn",
+                        "width": "1",
+                        "descr": "Issuer ethernet reset signal for PHY.",
+                    },
                 ],
+            },
+            {
+                "name": "mii",
+                "descr": "Ethernet MII interface",
+                "signals": {
+                    "type": "mii",
+                },
             },
         ]
     #
@@ -266,8 +267,8 @@ def setup(py_params_dict):
     #
     attributes_dict["subblocks"] = [
         {
-            "core_name": py_params_dict["instantiator"]["original_name"],
-            "instance_name": py_params_dict["instantiator"]["original_name"],
+            "core_name": py_params_dict["issuer"]["original_name"],
+            "instance_name": py_params_dict["issuer"]["original_name"],
             "instance_description": "IOb-SoC memory wrapper",
             "parameters": {
                 "AXI_ID_W": "AXI_ID_W",
@@ -284,7 +285,8 @@ def setup(py_params_dict):
         },
     ]
     if params["use_ethernet"]:
-        attributes_dict["subblocks"][-1]["connect"].update({"phy_io": "phy"})
+        attributes_dict["subblocks"][-1]["connect"].update({"mii_io": "mii"})
+        attributes_dict["subblocks"][-1]["connect"].update({"phy_rstn_o": "phy_rstn"})
     if params["use_extmem"]:
         attributes_dict["subblocks"][-1]["connect"].update({"axi_m": "axi"})
     attributes_dict["subblocks"] += [
@@ -315,13 +317,7 @@ def setup(py_params_dict):
                     "clk_rst_i": "ddr3_ctr_clk_rst",
                     "general_io": "ddr3_ctr_general",
                     "ddr3_io": "ddr3_io",
-                    "s0_axi_s": (
-                        "axi",
-                        [
-                            "{axi_araddr, 2'b0}",
-                            "{axi_awaddr, 2'b0}",
-                        ],
-                    ),
+                    "s0_axi_s": "axi",
                 },
             },
         ]
@@ -383,23 +379,40 @@ def setup(py_params_dict):
     assign enet_resetn_inv = ~enet_resetn_o;
 
     //MII
-    assign eth_MRxClk = eth_clk;
-    assign MRxD = {enet_rx_d3_i, enet_rx_d2_i, enet_rx_d1_i, enet_rx_d0_i};
-    assign MRxDv = enet_rx_dv_i;
-    //assign MRxErr = enet_rx_err_o;
-    assign MRxErr = 1'b0;
+    assign mii_rx_clk = eth_clk;
+    assign mii_rxd = {enet_rx_d3_i, enet_rx_d2_i, enet_rx_d1_i, enet_rx_d0_i};
+    assign mii_rx_dv = enet_rx_dv_i;
+    //assign mii_rx_er = enet_rx_err_o;
+    assign mii_rx_er = 1'b0;
 
-    assign eth_MTxClk = eth_clk;
-    assign {enet_tx_d3_o, enet_tx_d2_o, enet_tx_d1_o, enet_tx_d0_o} = MTxD;
-    assign enet_tx_en_o = MTxEn;
-    //assign enet_tx_err_o = MTxErr;
+    assign mii_tx_clk = eth_clk;
+    assign {enet_tx_d3_o, enet_tx_d2_o, enet_tx_d1_o, enet_tx_d0_o} = mii_txd;
+    assign enet_tx_en_o = mii_tx_en;
+    //assign enet_tx_err_o = mii_tx_er;
 
     assign enet_resetn_o = phy_rstn;
 
-    assign eth_MColl = 1'b0;
-    assign eth_MCrS = 1'b0;
+    assign mii_col = 1'b0;
+    assign mii_crs = 1'b0;
 """,
             },
         ]
 
+    # Create system clock constraint
+    if params["use_ethernet"]:
+        assert py_params_dict["build_dir"], "build_dir not set!"
+        fpga_folder = os.path.join(
+            py_params_dict["build_dir"],
+            "hardware/fpga/quartus/iob_cyclonev_gt_dk",
+        )
+        os.makedirs(fpga_folder, exist_ok=True)
+        with open(os.path.join(fpga_folder, "auto_board.sdc"), "w") as f:
+            f.write(
+                """\
+# This file was automatically generated by the iob_system_cyclonev_gt_dk.py script.
+
+# Clock groups
+set_clock_groups -asynchronous -group {clk} -group {rx_eth_clk}
+                """
+            )
     return attributes_dict

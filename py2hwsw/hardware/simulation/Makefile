@@ -94,7 +94,7 @@ VSRC:=$(filter-out ./src/$(NAME)_tb.v, $(VSRC))
 endif
 
 
-build: $(VHDR) $(VSRC) $(HEX) remote_build_dir
+build: $(VHDR) $(VSRC) $(BUILD_DEPS) remote_build_dir
 ifeq ($(SIM_SERVER),)
 	make comp
 else
@@ -105,7 +105,7 @@ endif
 GRAB_TIMEOUT ?= 300
 BOARD_GRAB_CMD=../../scripts/board_client.py grab $(GRAB_TIMEOUT)
 
-run: test.log
+run: $(BUILD_DEPS) test.log
 	@if ! grep -q "Test passed!" test.log; then echo "Test failed!"; exit 1; fi
 
 SIM_CMD=make exec
@@ -119,7 +119,7 @@ endif
 endif
 
 
-test.log: remote_build_dir
+test.log: build
 ifneq ($(TB),none)
 
 ifeq ($(SIM_SERVER),) #is simulator in local machine?
@@ -178,7 +178,7 @@ endif
 
 test: $(TEST_LIST)
 
-build_hex: $(HEX)
+build_deps: $(BUILD_DEPS)
 
 debug:
 	@echo NAME=$(NAME)
@@ -189,4 +189,4 @@ debug:
 
 .PRECIOUS: uut.vcd test.log
 
-.PHONY: build run waves gen-clean debug test $(TEST_LIST) fix-vcd remote_build_dir build_hex
+.PHONY: build run waves gen-clean debug test $(TEST_LIST) build_deps fix-vcd remote_build_dir

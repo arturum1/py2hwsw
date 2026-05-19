@@ -25,7 +25,7 @@ def setup(py_params_dict):
             },
             {
                 "name": "STRB_WIDTH",
-                "type": "P",
+                "type": "D",
                 "val": "(DATA_WIDTH / 8)",
                 "min": "NA",
                 "max": "NA",
@@ -74,7 +74,7 @@ def setup(py_params_dict):
             {
                 "name": "HEX_DATA_W",
                 "type": "P",
-                "val": "DATA_WIDTH",
+                "val": "32",
                 "min": "NA",
                 "max": "NA",
                 "descr": "Width of hex data",

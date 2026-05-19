@@ -5,6 +5,10 @@
 `timescale 1ns / 1ps
 `include "iob_csrs_demo_csrs_conf.vh"
 
+`define IOB_RESET(CLK, RESET, PRE, DURATION, POST) RESET=0;\
+   #PRE RESET=1; #DURATION RESET=0; #POST;\
+   @(posedge CLK) #1;
+
 module iob_csrs_demo_tb;
 
    localparam PER = 10;
@@ -25,13 +29,23 @@ module iob_csrs_demo_tb;
    wire [                        32-1:0] iob_rdata_o;
    wire                                  iob_ready_o;
    wire                                  iob_rvalid_o;
-   reg                                   iob_rready_i;
 
    initial begin
 `ifdef VCD
-      $dumpfile("iob_csrs_demo.vcd");
+      $dumpfile("uut.vcd");
       $dumpvars();
 `endif
+
+      rst         = 0;
+
+      // Initialize inputs
+      iob_valid_i = 0;
+      iob_addr_i  = 0;
+      iob_wdata_i = 0;
+      iob_wstrb_i = 0;
+
+      //apply async reset
+      `IOB_RESET(clk, rst, 100, 1_000, 100);
 
       if (1) begin  // TODO: Check if passed
          $display("%c[1;34m", 27);
@@ -52,20 +66,19 @@ module iob_csrs_demo_tb;
    end
 
    //instantiate iob_csrs_demo core
-   iob_csrs_demo iob_csrs_demo0 (
-      // clk_en_rst_s port
-      .clk_i                (clk),
-      .cke_i                (1'b1),
-      .arst_i               (rst),
-      // cbus_s port
-      .iob_csrs_iob_valid_i (iob_valid_i),
-      .iob_csrs_iob_addr_i  (iob_addr_i[`IOB_CSRS_DEMO_CSRS_ADDR_W-1:2]),
-      .iob_csrs_iob_wdata_i (iob_wdata_i),
-      .iob_csrs_iob_wstrb_i (iob_wstrb_i),
-      .iob_csrs_iob_rvalid_o(iob_rvalid_o),
-      .iob_csrs_iob_rdata_o (iob_rdata_o),
-      .iob_csrs_iob_ready_o (iob_ready_o),
-      .iob_csrs_iob_rready_i(iob_rready_i)
+   iob_csrs_demo csrs_demo0 (
+       // clk_en_rst_s port
+       .clk_i            (clk),
+       .cke_i            (1'b1),
+       .arst_i           (rst),
+       // cbus_s port
+       .csrs_iob_valid_i (iob_valid_i),
+       .csrs_iob_addr_i  (iob_addr_i),
+       .csrs_iob_wdata_i (iob_wdata_i),
+       .csrs_iob_wstrb_i (iob_wstrb_i),
+       .csrs_iob_rvalid_o(iob_rvalid_o),
+       .csrs_iob_rdata_o (iob_rdata_o),
+       .csrs_iob_ready_o (iob_ready_o)
    );
 
 endmodule

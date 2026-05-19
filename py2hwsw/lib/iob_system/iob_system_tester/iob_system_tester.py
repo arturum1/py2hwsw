@@ -21,6 +21,7 @@ def setup(py_params_dict):
                     "iob_aes_ku040_db_g",
                     "iob_cyclonev_gt_dk",
                     "iob_zybo_z7",
+                    "iob_smart_zynq_sl",
                 ],
                 "wires": [
                     {
@@ -45,7 +46,7 @@ def setup(py_params_dict):
                 "subblocks": [
                     {
                         # Instantiate SUT (usually iob_system or a child of it)
-                        "core_name": py_params_dict["instantiator"]["original_name"],
+                        "core_name": py_params_dict["issuer"]["original_name"],
                         "instance_name": "SUT",
                         "instance_description": "System Under Test (SUT) to be verified by this tester.",
                         # "is_peripheral": True,  # Only applies if SUT has CSRs (via regfileif).

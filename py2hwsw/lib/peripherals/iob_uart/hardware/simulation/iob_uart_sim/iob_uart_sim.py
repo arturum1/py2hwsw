@@ -42,7 +42,7 @@ def setup(py_params_dict):
             "descr": "Testbench uart csrs interface",
             "signals": {
                 "type": "iob",
-                "ADDR_W": 3,
+                "ADDR_W": 4,
             },
         },
     ]
@@ -63,13 +63,20 @@ def setup(py_params_dict):
             "signals": {
                 "type": params["csr_if"],
                 "prefix": "internal_",
-                "ADDR_W": 3 - 2,  # Does not include 2 LSBs
+                "ADDR_W": 4,
             },
         },
     ]
     #
     # Blocks
     #
+
+    converter_connect = {
+        "s_s": "uart_s",
+        "m_m": "uart_cbus",
+    }
+    if params["csr_if"] != "iob":
+        converter_connect["clk_en_rst_s"] = "clk_en_rst_s"
     attributes_dict["subblocks"] = [
         {
             "core_name": "iob_uart",
@@ -78,113 +85,23 @@ def setup(py_params_dict):
             "csr_if": params["csr_if"],
             "connect": {
                 "clk_en_rst_s": "clk_en_rst_s",
-                "iob_csrs_cbus_s": "uart_cbus",
+                "csrs_cbus_s": "uart_cbus",
                 "rs232_m": "rs232_loopback",
             },
         },
+        {
+            "core_name": "iob_universal_converter",
+            "instance_name": "iob_universal_converter",
+            "instance_description": "Convert IOb port from testbench into correct interface for UART CSRs bus",
+            "subordinate_if": "iob",
+            "manager_if": params["csr_if"],
+            "parameters": {
+                "ADDR_W": 4,
+                "DATA_W": "DATA_W",
+            },
+            "connect": converter_connect,
+        },
     ]
-    if params["csr_if"] == "wb":
-        # "Wishbone" CSR_IF
-        attributes_dict["subblocks"].append(
-            {
-                "core_name": "iob_iob2wishbone",
-                "instance_name": "iob_iob2wishbone_coverter",
-                "instance_description": "Convert IOb port from testbench into Wishbone interface for UART CSRs bus",
-                "parameters": {
-                    "ADDR_W": 3 - 2,
-                    "DATA_W": "DATA_W",
-                },
-                "connect": {
-                    "clk_en_rst_s": "clk_en_rst_s",
-                    "wb_m": "uart_cbus",
-                    "iob_s": (
-                        "uart_s",
-                        [
-                            "iob_addr_i[3-1:2]",
-                        ],
-                    ),
-                },
-            }
-        )
-    elif params["csr_if"] == "apb":
-        # "APB" CSR_IF
-        attributes_dict["subblocks"].append(
-            {
-                "core_name": "iob_iob2apb",
-                "instance_name": "iob_iob2apb_coverter",
-                "instance_description": "Convert IOb port from testbench into APB interface for UART CSRs bus",
-                "parameters": {
-                    "APB_ADDR_W": 3 - 2,
-                    "APB_DATA_W": "DATA_W",
-                    "ADDR_W": 3 - 2,
-                    "DATA_W": "DATA_W",
-                },
-                "connect": {
-                    "clk_en_rst_s": "clk_en_rst_s",
-                    "apb_m": "uart_cbus",
-                    "iob_s": (
-                        "uart_s",
-                        [
-                            "iob_addr_i[3-1:2]",
-                        ],
-                    ),
-                },
-            }
-        )
-    elif params["csr_if"] == "axil":
-        # "AXI_Lite" CSR_IF
-        attributes_dict["subblocks"].append(
-            {
-                "core_name": "iob_iob2axil",
-                "instance_name": "iob_iob2axil_coverter",
-                "instance_description": "Convert IOb port from testbench into AXI-Lite interface for UART CSRs bus",
-                "parameters": {
-                    "AXIL_ADDR_W": 3 - 2,
-                    "AXIL_DATA_W": "DATA_W",
-                },
-                "connect": {
-                    "clk_en_rst_s": "clk_en_rst_s",
-                    "axil_m": "uart_cbus",
-                    "iob_s": (
-                        "uart_s",
-                        [
-                            "iob_addr_i[3-1:2]",
-                        ],
-                    ),
-                },
-            }
-        )
-    elif params["csr_if"] == "axi":
-        # "AXI" CSR_IF
-        attributes_dict["subblocks"].append(
-            {
-                "core_name": "iob_iob2axi",
-                "instance_name": "iob_iob2axi_coverter",
-                "instance_description": "Convert IOb port from testbench into AXI interface for UART CSRs bus",
-                "parameters": {
-                    "ADDR_WIDTH": 3 - 2,
-                    "DATA_WIDTH": "DATA_W",
-                    "AXI_ID_WIDTH": "AXI_ID_W",
-                    "AXI_LEN_WIDTH": "AXI_LEN_W",
-                },
-                "connect": {
-                    "clk_en_rst_s": "clk_en_rst_s",
-                    "axi_m": (
-                        "uart_cbus",
-                        [
-                            "axi_awlock_i[0]",
-                            "axi_arlock_i[0]",
-                        ],
-                    ),
-                    "iob_s": (
-                        "uart_s",
-                        [
-                            "iob_addr_i[3-1:2]",
-                        ],
-                    ),
-                },
-            }
-        )
     #
     # Snippets
     #
@@ -192,18 +109,6 @@ def setup(py_params_dict):
     snippet_code = """
    assign rs232_rxd = rs232_txd;
    assign rs232_cts = rs232_rts;
-"""
-    if params["csr_if"] == "iob":
-        snippet_code += """
-   // Directly connect cbus IOb port to internal IOb wires
-   assign internal_iob_valid = iob_valid_i;
-   assign internal_iob_addr = iob_addr_i[3-1:2]; // Ignore 2 LSBs
-   assign internal_iob_wdata = iob_wdata_i;
-   assign internal_iob_wstrb = iob_wstrb_i;
-   assign internal_iob_rready = iob_rready_i;
-   assign iob_rvalid_o = internal_iob_rvalid;
-   assign iob_rdata_o = internal_iob_rdata;
-   assign iob_ready_o = internal_iob_ready;
 """
     attributes_dict["snippets"] += [
         {"verilog_code": snippet_code},

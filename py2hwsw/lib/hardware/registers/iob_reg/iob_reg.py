@@ -4,6 +4,9 @@
 
 import sys
 
+sys.path.append("../../../scripts")
+from iob_globals import iob_globals
+
 
 def setup(py_params_dict):
 
@@ -14,49 +17,49 @@ def setup(py_params_dict):
     )
     assert "clk_en_rst_s" in port_params, "clk_en_rst_s port is missing"
 
-    clk_s_params = [x for x in port_params["clk_en_rst_s"].split("_") if x != ""]
+    reset_polarity = getattr(iob_globals(), "reset_polarity", "positive")
 
-    # Remove duplicated entries
-    clk_s_params = list(dict.fromkeys(clk_s_params))
+    clk_port_params = port_params["clk_en_rst_s"]
+
+    if reset_polarity != "positive":
+        port_params["clk_en_rst_s"] = port_params["clk_en_rst_s"].replace("a", "an")
+
+    clk_s_params_list = [x for x in port_params["clk_en_rst_s"].split("_") if x != ""]
 
     suffix_list = [
         "c",
-        "cn",
         "a",
         "an",
         "r",
-        "rn",
         "e",
-        "en",
     ]
 
-    suffix = "".join([x for x in suffix_list if x in clk_s_params])
+    suffix = "".join([x for x in suffix_list if x in clk_s_params_list])
 
-    reg_type = "iob_regn" if "n" in clk_s_params else "iob_reg"
+    reg_type = "iob_regn" if "n" in clk_s_params_list else "iob_reg"
 
     reg_name = "_".join(filter(lambda x: x != "", [reg_type, suffix]))
 
     rst_str = ""
     en_str = ""
 
-    sensitivity_list = "negedge clk_i" if "n" in clk_s_params else "posedge clk_i"
-    if "a" in clk_s_params:
+    sensitivity_list = "negedge clk_i" if "n" in clk_s_params_list else "posedge clk_i"
+
+    if "a" in clk_s_params_list:
         sensitivity_list = f"{sensitivity_list}, posedge arst_i"
-    elif "an" in clk_s_params:
+    elif "an" in clk_s_params_list:
         sensitivity_list = f"{sensitivity_list}, negedge arst_n_i"
 
-    if any([x in clk_s_params for x in ["a", "an"]]):
-        arst_con = f"{'arst' if 'a' in clk_s_params else '~arst_n'}_i"
+    if any([x in clk_s_params_list for x in ["a", "an"]]):
+        arst_con = f"{'arst' if 'a' in clk_s_params_list else '~arst_n'}_i"
         rst_str += f"        if ({arst_con}) begin\n            data_o <= RST_VAL;\n        end"
-    if any([x in clk_s_params for x in ["r", "rn"]]):
-        rst_con = f"{'rst' if 'r' in clk_s_params else '~rst_n'}_i"
-        rst_str += f"{' else ' if rst_str != '' else '        '}if ({rst_con}) begin\n            data_o <= RST_VAL;\n        end"
 
-    if any([x in clk_s_params for x in ["c", "cn", "e", "en"]]):
+    if "r" in clk_s_params_list:
+        rst_str += f"{' else ' if rst_str != '' else '        '}if (rst_i) begin\n            data_o <= RST_VAL;\n        end"
+
+    if any([x in clk_s_params_list for x in ["c", "e"]]):
         en_con = (
-            " & ".join([f"{x}_i" for x in ["c", "cn", "e", "en"] if x in clk_s_params])
-            .replace("cn_i", "~cke_n_i")
-            .replace("en_i", "~en_n_i")
+            " & ".join([f"{x}_i" for x in ["c", "e"] if x in clk_s_params_list])
             .replace("e_i", "en_i")
             .replace("c_i", "cke_i")
         )
@@ -72,10 +75,10 @@ def setup(py_params_dict):
             {
                 "name": "port_params",
                 "val": port_params,
-                "descr": "Port parameters are passed to if_gen interfaces to generate different interfaces based on the parameters.",
+                "descr": "Port parameters are passed to interfaces to generate different interfaces.",
             },
         ],
-        "version": "0.1",
+        "version": "0.1.0",
         "confs": [
             {
                 "name": "DATA_W",
@@ -99,7 +102,7 @@ def setup(py_params_dict):
                 "name": "clk_en_rst_s",
                 "signals": {
                     "type": "iob_clk",
-                    "params": port_params["clk_en_rst_s"],
+                    "params": clk_port_params,
                 },
                 "descr": "Clock, clock enable and reset",
             },

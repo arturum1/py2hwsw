@@ -24,7 +24,6 @@ and output, respectively.)
 - `rdata_o`: read data
 - `rvalid_o`: valid read data
 - `ready_o`: subordinate ready for transaction output
-- `rready_i`: manager ready for read data
 
 Transactions occur when both `valid_i` and `ready_o` are HIGH for one `clk_i`
 period.
@@ -35,7 +34,9 @@ Byte `i` is written if `wstrb_i[i]` is HIGH and not otherwise.
 
 ## Read Transaction
 For READ operations: when `valid_i` and `ready_o` are HIGH, address `addr_i` is
-read. The data on `rdata_o` is available when `rvalid_o` is HIGH. The transaction completes when `rready_i` and `rvalid_o` are HIGH.
+read. The data on `rdata_o` is available when `rvalid_o` is HIGH. The transaction completes when `rvalid_o` is HIGH.
+The `rvalid_o` cannot be asserted on the same clock cycle as `valid_i` and `ready_o`, only on later clock cycles.
+The `rvalid_o` signal must only be asserted during one clock cycle at most, since the manager is always ready (iob protocol does not have a rready signal).
 
 ![Example Read Transaction](document/iob_if_read.png "Read Transaction")
 

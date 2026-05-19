@@ -4,7 +4,7 @@
 
 `timescale 1ns / 1ps
 `include "iob_axistream_out_conf.vh"
-`include "iob_axistream_out_csrs.vh"
+`include "iob_axistream_out_csrs_conf.vh"
 
 module iob_axistream_out #(
    `include "iob_axistream_out_params.vs"
@@ -63,6 +63,7 @@ module iob_axistream_out #(
    assign sys_tready_o = ~fifo_full_rd & enable_wr & (mode_wr == 1'b1);
 
    //FIFO write
+   assign data_wen_wr = data_valid_wr & data_ready_wr & |data_wstrb_wr;
    assign fifo_write     = ((data_wen_wr & (mode_wr == 1'b0)) |
                            (sys_tvalid_i & (mode_wr == 1'b1))) &
                            enable_wr;
@@ -124,12 +125,12 @@ module iob_axistream_out #(
       .DATA_W (DATA_W),
       .RST_VAL({DATA_W{1'd0}})
    ) word_count_inst (
-      .clk_i (axis_clk_i),
-      .cke_i (axis_cke_i),
-      .arst_i(axis_arst_i),
-      .rst_i (axis_sw_rst),
-      .en_i  (axis_fifo_read),
-      .data_o(axis_word_count)
+      .clk_i        (axis_clk_i),
+      .cke_i        (axis_cke_i),
+      .arst_i       (axis_arst_i),
+      .counter_rst_i(axis_sw_rst),
+      .counter_en_i (axis_fifo_read),
+      .data_o       (axis_word_count)
    );
 
 

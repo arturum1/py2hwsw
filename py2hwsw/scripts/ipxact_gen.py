@@ -10,7 +10,6 @@ import re
 import os
 import sys
 from iob_signal import iob_signal
-from if_gen import if_details
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib/hardware/iob_csrs")
@@ -74,7 +73,12 @@ def escape_xml_special_chars(string):
     """
     if type(string) is not str:
         return string
-    return string.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+    return (
+        string.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
 
 class Parameter:
@@ -136,7 +140,17 @@ class SwRegister:
     """
 
     def __init__(
-        self, name, address, hw_size, access, rst, rst_val, volatile, description, parameters_list, fields
+        self,
+        name,
+        address,
+        hw_size,
+        access,
+        rst,
+        rst_val,
+        volatile,
+        description,
+        parameters_list,
+        fields,
     ):
         self.name = name
         self.address = address
@@ -155,7 +169,7 @@ class SwRegister:
                 for param in parameters_list:
                     # only replace complete words
                     max_size = re.sub(
-                        r"\b" + param.name + r"\b", param.max_value, max_size
+                        r"\b" + param.name + r"\b", str(param.max_value), max_size
                     )
 
                 # if the string only contains numbers or operators, evaluate it and break the loop
@@ -163,8 +177,12 @@ class SwRegister:
                     max_size = eval(max_size)
                     break
 
-        # Compute the the size of the register in steps of 8 bits, rounding up
-        self.sw_size = 8 * math.ceil(max_size / 8)
+        # Compute the size of the register in steps of 8 bits, rounding up
+        sw_size = 8 * math.ceil(max_size / 8)
+        # If the size is 24 bits, set it to 32 bits
+        if sw_size == 24:
+            sw_size = 32
+        self.sw_size = sw_size
 
         self.access = access
         self.rst = rst
@@ -191,9 +209,9 @@ class SwRegister:
         fields_xml = ""
         for csr_field in self.fields:
             # set the access type
-            if csr_field.type == "R":
+            if csr_field.mode == "R":
                 field_access_type = "read-only"
-            elif csr_field.type == "W":
+            elif csr_field.mode == "W":
                 field_access_type = "write-only"
             else:
                 field_access_type = "read-write"
@@ -209,6 +227,8 @@ class SwRegister:
 						<ipxact:bitWidth>{csr_field.width}</ipxact:bitWidth>
 						<ipxact:volatile>{str(csr_field.volatile).lower()}</ipxact:volatile>
 						<ipxact:access>{field_access_type}</ipxact:access>
+						<ipxact:modifiedWriteValue>{csr_field.write_action}</ipxact:modifiedWriteValue>
+						<ipxact:readAction>{csr_field.read_action}</ipxact:readAction>
 					</ipxact:field>
 """
 
@@ -216,7 +236,7 @@ class SwRegister:
         xml_code = f"""<ipxact:register>
 					<ipxact:name>{self.name}</ipxact:name>
 					<ipxact:description>{self.description}</ipxact:description>
-					<ipxact:addressOffset>{self.address}</ipxact:addressOffset>
+					<ipxact:addressOffset>"16'h{self.address:04X}</ipxact:addressOffset>
 					<ipxact:size>{self.sw_size}</ipxact:size>
 					<ipxact:volatile>{str(self.volatile).lower()}</ipxact:volatile>
 					<ipxact:access>{access_type}</ipxact:access>
@@ -400,7 +420,7 @@ def gen_bus_interfaces_xml(bus_interfaces_list, ports_list, parameters_list):
 """
 
         # Find interface details (including VLNV)
-        bus_details = next(i for i in if_details if i["name"] == bus_interface.type)
+        bus_details = bus_interface.get_interface_details()
         if_mode = "master" if port_name.endswith("_m") else "slave"
         bus_interfaces_xml += f"""\
 		<ipxact:busInterface>
@@ -427,11 +447,11 @@ def gen_bus_interfaces_xml(bus_interfaces_list, ports_list, parameters_list):
 def gen_bus_interface_xml_file(bus_interface, dest_dir):
     """
     Generate the IPXACT XML file for given bus interface.
-    @param bus_interface: bus interface object (if_gen.py 'interface' object)
+    @param bus_interface: bus interface object (interfaces.py 'interface' object)
     @param dest_dir: destination directory
     """
     # Find interface details (including VLNV)
-    bus_details = next(i for i in if_details if i["name"] == bus_interface.type)
+    bus_details = bus_interface.get_interface_details()
 
     # Create the destination directory if it doesn't exist
     if not os.path.exists(dest_dir):
@@ -439,7 +459,7 @@ def gen_bus_interface_xml_file(bus_interface, dest_dir):
 
     # Create the Bus Definition file for the interface
     with open(
-        f"{dest_dir}/interface_{bus_interface.type}.{bus_details['version']}.xml", "w"
+        f"{dest_dir}/interface_{bus_details['name']}.{bus_details['version']}.xml", "w"
     ) as f:
         f.write(
             f"""\
@@ -495,7 +515,7 @@ def gen_memory_map_xml(sw_regs, parameters_list):
             sw_reg.name,
             sw_reg.addr,
             sw_reg.n_bits,
-            sw_reg.type,
+            sw_reg.mode,
             "arst_i",
             sw_reg.rst_val,
             sw_reg.volatile,
@@ -689,12 +709,9 @@ def generate_ipxact_xml(core, dest_dir):
 
     csr_block = None
     # Find iob_csrs block in subblocks list
-    for block_group in core.subblocks:
-        for block in block_group.blocks:
-            if block.original_name == "iob_csrs":
-                csr_block = block
-                break
-        if csr_block:
+    for block in core.subblocks:
+        if block.original_name == "iob_csrs":
+            csr_block = block
             break
 
     # Add the CSR IF,
@@ -717,7 +734,7 @@ def generate_ipxact_xml(core, dest_dir):
     # Genererate the memory map xml code
     memory_map_xml = ""
     if csr_block:
-        sw_regs = static_reg_tables[core.name + "_csrs"]
+        sw_regs = static_reg_tables[csr_block.name]
         memory_map_xml = gen_memory_map_xml(sw_regs, parameters_list)
 
     # Generate instantiations xml code

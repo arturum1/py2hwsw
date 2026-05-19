@@ -16,7 +16,6 @@ endif
 
 REMOTE_BUILD_DIR=$(USER)/$(BUILD_DIR_NAME)
 REMOTE_FPGA_DIR=$(REMOTE_BUILD_DIR)/hardware/fpga
-EMB_DIR = ../../software
 PYTHON_DIR = ../../scripts
 
 #default board
@@ -36,7 +35,6 @@ endif
 
 
 FPGA_TOP ?=$(NAME)_$(BOARD)
-SDC_PREFIX ?=$(NAME)
 
 
 include $(FPGA_TOOL)/$(BOARD)/board.mk
@@ -83,7 +81,6 @@ BOARD_GRAB_CMD=../../scripts/board_client.py grab $(GRAB_TIMEOUT)
 run: build $(RUN_DEPS)
 ifneq ($(NORUN),1)
 ifeq ($(BOARD_SERVER),)
-	cp $(EMB_DIR)/$(NAME)_firmware.bin .
 	$(BOARD_GRAB_CMD) -p '$(FPGA_PROG)' -c '$(CONSOLE_CMD)'  && echo "Checking test log..." && test "$$(cat test.log)" = "Test passed!"
 else
 	ssh $(BOARD_USER)@$(BOARD_SERVER) "if [ ! -d $(REMOTE_BUILD_DIR) ]; then mkdir -p $(REMOTE_BUILD_DIR); fi"
@@ -95,7 +92,7 @@ endif
 
 # clean
 clean: $(FPGA_TOOL)-clean
-	find . -maxdepth 1 -type f -not \( -name "Makefile" -o -name "fpga_build.mk" -o -name "uut_build.mk" \) -delete
+	find . -maxdepth 1 -type f -not \( -name "Makefile" -o -name "*fpga_build.mk" -o -name "uut_build.mk" \) -delete
 	@rm -rf resynthesis *.hex
 ifneq ($(FPGA_SERVER),)
 	ssh $(FPGA_SSH_FLAGS) $(FPGA_USER)@$(FPGA_SERVER) 'rm -rf $(REMOTE_BUILD_DIR)'

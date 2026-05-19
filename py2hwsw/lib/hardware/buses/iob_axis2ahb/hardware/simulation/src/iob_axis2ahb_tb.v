@@ -4,15 +4,12 @@
 
 `timescale 1ns / 1ps
 
-`include "iob_axistream_in_csrs.vh"
 `include "iob_axistream_in_csrs_conf.vh"
 `include "iob_axistream_in_conf.vh"
-`include "iob_axistream_out_csrs.vh"
 `include "iob_axistream_out_csrs_conf.vh"
 `include "iob_axistream_out_conf.vh"
 
 `define IOB_GET_NBYTES(WIDTH) (WIDTH/8 + |(WIDTH%8))
-`define IOB_WORD_ADDRESS(ADDR) ((ADDR>>2)<<2)
 
 `define IOB_BYTE_OFFSET(ADDR) (ADDR%(32/8))
 
@@ -57,7 +54,6 @@ module iob_axis2ahb_tb;
    reg     [                    (DATA_W/8)-1:0] axis_in_iob_wstrb;
    wire                                         axis_in_iob_rvalid;
    wire    [                        DATA_W-1:0] axis_in_iob_rdata;
-   reg                                          axis_in_iob_rready;
    wire                                         axis_in_iob_ready;
 
    // AXIS OUT IOb
@@ -67,7 +63,6 @@ module iob_axis2ahb_tb;
    reg     [                    (DATA_W/8)-1:0] axis_out_iob_wstrb;
    wire                                         axis_out_iob_rvalid;
    wire    [                        DATA_W-1:0] axis_out_iob_rdata;
-   reg                                          axis_out_iob_rready;
    wire                                         axis_out_iob_ready;
 
    // AXIS2AHB config
@@ -115,21 +110,19 @@ module iob_axis2ahb_tb;
       $dumpvars();
 `endif
 
-      config_in_valid     = 0;
-      config_out_valid    = 0;
-      config_out_length   = 0;
+      config_in_valid    = 0;
+      config_out_valid   = 0;
+      config_out_length  = 0;
 
-      axis_in_iob_valid   = 0;
-      axis_in_iob_wdata   = 0;
-      axis_in_iob_addr    = 0;
-      axis_in_iob_wstrb   = 0;
-      axis_in_iob_rready  = 0;
+      axis_in_iob_valid  = 0;
+      axis_in_iob_wdata  = 0;
+      axis_in_iob_addr   = 0;
+      axis_in_iob_wstrb  = 0;
 
-      axis_out_iob_valid  = 0;
-      axis_out_iob_wdata  = 0;
-      axis_out_iob_addr   = 0;
-      axis_out_iob_wstrb  = 0;
-      axis_out_iob_rready = 0;
+      axis_out_iob_valid = 0;
+      axis_out_iob_wdata = 0;
+      axis_out_iob_addr  = 0;
+      axis_out_iob_wstrb = 0;
 
       //apply async reset
       `IOB_RESET(clk, arst, 100, 1_000, 100);
@@ -227,15 +220,14 @@ module iob_axis2ahb_tb;
       .sys_tdata_o          (),
       .sys_tvalid_o         (),
       .sys_tready_i         (1'b0),
-      // iob_csrs_cbus_s
-      .iob_csrs_iob_valid_i (axis_in_iob_valid),
-      .iob_csrs_iob_addr_i  (axis_in_iob_addr[`IOB_AXISTREAM_IN_CSRS_ADDR_W-1:2]),
-      .iob_csrs_iob_wdata_i (axis_in_iob_wdata),
-      .iob_csrs_iob_wstrb_i (axis_in_iob_wstrb),
-      .iob_csrs_iob_rvalid_o(axis_in_iob_rvalid),
-      .iob_csrs_iob_rdata_o (axis_in_iob_rdata),
-      .iob_csrs_iob_rready_i(axis_in_iob_rready),
-      .iob_csrs_iob_ready_o (axis_in_iob_ready)
+      // csrs_cbus_s
+      .csrs_iob_valid_i (axis_in_iob_valid),
+      .csrs_iob_addr_i  (axis_in_iob_addr),
+      .csrs_iob_wdata_i (axis_in_iob_wdata),
+      .csrs_iob_wstrb_i (axis_in_iob_wstrb),
+      .csrs_iob_rvalid_o(axis_in_iob_rvalid),
+      .csrs_iob_rdata_o (axis_in_iob_rdata),
+      .csrs_iob_ready_o (axis_in_iob_ready)
    );
 
    iob_axistream_out #(
@@ -262,15 +254,14 @@ module iob_axis2ahb_tb;
       .sys_tdata_i          ({DATA_W{1'b0}}),
       .sys_tvalid_i         (1'b0),
       .sys_tready_o         (),
-      // iob_csrs_cbus_s
-      .iob_csrs_iob_valid_i (axis_out_iob_valid),
-      .iob_csrs_iob_addr_i  (axis_out_iob_addr[`IOB_AXISTREAM_IN_CSRS_ADDR_W-1:2]),
-      .iob_csrs_iob_wdata_i (axis_out_iob_wdata),
-      .iob_csrs_iob_wstrb_i (axis_out_iob_wstrb),
-      .iob_csrs_iob_rvalid_o(axis_out_iob_rvalid),
-      .iob_csrs_iob_rdata_o (axis_out_iob_rdata),
-      .iob_csrs_iob_rready_i(axis_out_iob_rready),
-      .iob_csrs_iob_ready_o (axis_out_iob_ready)
+      // csrs_cbus_s
+      .csrs_iob_valid_i (axis_out_iob_valid),
+      .csrs_iob_addr_i  (axis_out_iob_addr),
+      .csrs_iob_wdata_i (axis_out_iob_wdata),
+      .csrs_iob_wstrb_i (axis_out_iob_wstrb),
+      .csrs_iob_rvalid_o(axis_out_iob_rvalid),
+      .csrs_iob_rdata_o (axis_out_iob_rdata),
+      .csrs_iob_ready_o (axis_out_iob_ready)
    );
 
    iob_axis2ahb #(
@@ -322,9 +313,8 @@ module iob_axis2ahb_tb;
       .ADDR_WIDTH(MEM_ADDR_W),
       .DATA_WIDTH(DATA_W)
    ) ahb_ram0 (
-      // clk_en_rst_s
       .clk_i           (clk),
-      .arst_n_i        (~arst),
+      .arst_i          (arst),
       // ahb_s
       .s_ahb_addr_i    (ahb_addr),
       .s_ahb_burst_i   (ahb_burst),
@@ -349,7 +339,7 @@ module iob_axis2ahb_tb;
 
       begin
          @(posedge clk) #1 axis_in_iob_valid = 1;  //sync and assign
-         axis_in_iob_addr  = `IOB_WORD_ADDRESS(addr);
+         axis_in_iob_addr  = addr;
          axis_in_iob_wdata = `IOB_GET_WDATA(addr, data);
          axis_in_iob_wstrb = `IOB_GET_WSTRB(addr, width);
 
@@ -368,16 +358,14 @@ module iob_axis2ahb_tb;
 
       begin
          @(posedge clk) #1 axis_in_iob_valid = 1;
-         axis_in_iob_addr  = `IOB_WORD_ADDRESS(addr);
+         axis_in_iob_addr  = addr;
          axis_in_iob_wstrb = 0;
 
          #1 while (!axis_in_iob_ready) #1;
          @(posedge clk) #1 axis_in_iob_valid = 0;
-         @(posedge clk) #1 axis_in_iob_rready = 1;
 
          while (!axis_in_iob_rvalid) #1;
          data = #1 `IOB_GET_RDATA(addr, axis_in_iob_rdata, width);
-         @(posedge clk) #1 axis_in_iob_rready = 0;
       end
    endtask
 
@@ -389,7 +377,7 @@ module iob_axis2ahb_tb;
 
       begin
          @(posedge clk) #1 axis_out_iob_valid = 1;  //sync and assign
-         axis_out_iob_addr  = `IOB_WORD_ADDRESS(addr);
+         axis_out_iob_addr  = addr;
          axis_out_iob_wdata = `IOB_GET_WDATA(addr, data);
          axis_out_iob_wstrb = `IOB_GET_WSTRB(addr, width);
 
@@ -408,16 +396,14 @@ module iob_axis2ahb_tb;
 
       begin
          @(posedge clk) #1 axis_out_iob_valid = 1;
-         axis_out_iob_addr  = `IOB_WORD_ADDRESS(addr);
+         axis_out_iob_addr  = addr;
          axis_out_iob_wstrb = 0;
 
          #1 while (!axis_out_iob_ready) #1;
          @(posedge clk) #1 axis_out_iob_valid = 0;
-         @(posedge clk) #1 axis_out_iob_rready = 1;
 
          while (!axis_out_iob_rvalid) #1;
          data = #1 `IOB_GET_RDATA(addr, axis_out_iob_rdata, width);
-         @(posedge clk) #1 axis_out_iob_rready = 0;
       end
    endtask
 

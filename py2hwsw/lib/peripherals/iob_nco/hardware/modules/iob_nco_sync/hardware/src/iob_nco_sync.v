@@ -4,7 +4,7 @@
 
 `timescale 1ns / 1ps
 `include "iob_nco_sync_conf.vh"
-`include "iob_nco_csrs.vh"
+`include "iob_nco_csrs_conf.vh"
 
 module iob_nco_sync #(
    `include "iob_nco_sync_params.vs"
@@ -89,7 +89,7 @@ module iob_nco_sync #(
    );
 
    // audio in FIFO memory
-   iob_regfile_at2p #(
+   iob_regarray_at2p #(
       .ADDR_W(1),
       .DATA_W(PERIOD_W)
    ) audio_in_fifo_regs (

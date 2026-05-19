@@ -5,12 +5,12 @@
 
 def setup(py_params_dict):
     attributes_dict = {
-        "name": py_params_dict["instantiator"]["name"] + "_iob_aes_ku040_db_g",
+        "name": py_params_dict["issuer"]["name"] + "_iob_aes_ku040_db_g",
         "generate_hw": False,
         "confs": [
             {
                 "name": "DDR_ADDR_W",
-                "descr": "Width of DDR memory address bus (byte addressed).",
+                "descr": "Width of DDR memory address bus (byte addressed). This Kintex UltraScale Development Board has 1GB DDR4 SDRAM.",
                 "type": "D",
                 "val": "30",
             },

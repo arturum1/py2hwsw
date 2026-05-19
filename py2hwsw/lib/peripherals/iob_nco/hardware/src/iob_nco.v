@@ -4,7 +4,7 @@
 
 `timescale 1ns / 1ps
 `include "iob_nco_conf.vh"
-`include "iob_nco_csrs.vh"
+`include "iob_nco_csrs_conf.vh"
 
 module iob_nco #(
    `include "iob_nco_params.vs"
@@ -26,6 +26,13 @@ module iob_nco #(
 
    // configuration control and status register file.
    `include "iob_nco_subblocks.vs"
+
+   wire                  period_int_wen_wr;
+   assign period_int_wen_wr = period_int_valid_wr & (|period_int_wstrb_wr);
+
+   wire                  period_frac_wen_wr;
+   assign period_frac_wen_wr = period_frac_valid_wr & (|period_frac_wstrb_wr);
+
 
    // Concatenate Integer and fractional Period registers
    wire [(2*DATA_W)-1:0] period_full_wdata;

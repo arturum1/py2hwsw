@@ -21,8 +21,23 @@ endif
 #           Embedded settings           #
 #########################################
 
-TEMPLATE_LDS ?=template.lds
+# ifneq ($(filter iob_smart_zynq_sl iob_zybo_z7,$(BOARD)),)
+# IS_ZYNQ=1
+# endif
 
+ifeq ($(IS_ZYNQ),1)
+TEMPLATE_LDS ?=zynq_ps.ld
+else
+TEMPLATE_LDS ?=template.lds
+endif
+
+ifeq ($(IS_ZYNQ),1)
+# Zynq ARM Cortex-A9 settings
+TOOLCHAIN_PREFIX ?= arm-none-eabi-
+CFLAGS ?= -Os -mcpu=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=hard -ffreestanding -nostdlib -Wall $(USER_CFLAGS)
+LFLAGS ?= -Wl,-L,src,-Bstatic,-T,$(TEMPLATE_LDS),--strip-debug
+else
+# RISC-V settings
 MFLAGS=$(MFLAGS_BASE)$(MFLAG_M)$(MFLAG_C)
 MFLAGS_BASE:=rv32i
 ifeq ($(USE_MUL_DIV),1)
@@ -31,14 +46,14 @@ endif
 ifeq ($(USE_COMPRESSED),1)
 MFLAG_C=c
 endif
-ifeq ($(NO_HW_DRIVER),)
-EXTRA_SRC+=src/hw_driver.c
-endif
-
-#default compiler settings
 TOOLCHAIN_PREFIX ?=riscv64-unknown-elf-
 CFLAGS ?=-Os -nostdlib -march=$(MFLAGS) -mabi=ilp32 --specs=nano.specs -Wcast-align=strict $(USER_CFLAGS)
 LFLAGS ?= -Wl,-L,src,-Bstatic,-T,$(TEMPLATE_LDS),--strip-debug
+endif
+
+ifeq ($(NO_HW_DRIVER),)
+EXTRA_SRC+=src/hw_driver.c
+endif
 LLIBS ?=-lgcc -lc -lnosys
 INCLUDES ?=-I. -Isrc
 
@@ -100,12 +115,12 @@ run_emul: test.log
 #########################################
 
 ifneq ($(wildcard ./src/$(NAME)_csrs.c),)
-CSRS ?= ./src/$(NAME)_csrs.c
+TB_SRC ?= ./src/$(NAME)_csrs.c
 endif
 
 TB_INCLUDES ?=-I./src
 
-tb: ./src/iob_c_tb.c ./src/iob_core_tb.c $(CSRS)
+tb: ./src/iob_c_tb.c ./src/iob_core_tb.c $(TB_SRC)
 	gcc $(TB_INCLUDES) -g -o $@ $^
 
 

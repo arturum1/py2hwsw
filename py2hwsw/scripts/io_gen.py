@@ -10,7 +10,7 @@
 from latex import write_table
 import os
 
-import if_gen
+import interfaces
 from iob_signal import iob_signal
 
 
@@ -31,22 +31,12 @@ def generate_ports(core):
         if port.doc_only:
             continue
 
-        # Open ifdef if conditional interface
-        if port.if_defined:
-            lines.append(f"`ifdef {port.if_defined}\n")
-        if port.if_not_defined:
-            lines.append(f"`ifndef {port.if_not_defined}\n")
-
         lines.append(f"    // {port.name}: {port.descr}\n")
 
         for signal_idx, signal in enumerate(port.signals):
             if isinstance(signal, iob_signal):
                 if signal.get_verilog_port():
                     lines.append("    " + signal.get_verilog_port())
-
-        # Close ifdef if conditional interface
-        if port.if_defined or port.if_not_defined:
-            lines.append("`endif\n")
 
     # Remove comma from last port line
     if lines:
@@ -75,7 +65,7 @@ def generate_ports_snippet(core):
         # Note: This is only used by manually written verilog modules.
         #       May not be needed in the future.
         if port.interface:
-            if_gen.gen_if(port.interface)
+            port.interface.gen_all_vs_files()
 
             # move all .vs files from current directory to out_dir
             for file in os.listdir("."):
@@ -95,32 +85,32 @@ Note that the ouput signals are registered in the core, while the input signals 
     for port in ports:
         if_file.write(
             """
-\\begin{table}[H]
-  \\centering
-  \\begin{tabularx}{\\textwidth}{|l|l|r|X|}
-
-    \\hline
-    \\rowcolor{iob-green}
-    {\\bf Name} & {\\bf Direction} & {\\bf Width} & {\\bf Description}  \\\\ \\hline \\hline
-
-    \\input """
-            + port.name
-            + """_if_tab
-
-  \\end{tabularx}
+{
+\\setlength{\\LTcapwidth}{\\linewidth} % make sure the caption takes up the whole linewidth
+\\begin{xltabular}{\\textwidth}{|l|l|r|X|}
+  \\hline
+  \\rowcolor{iob-green}
+  {\\bf Name} & {\\bf Direction} & {\\bf Width} & {\\bf Description}  \\\\ \\hline \\hline
+  \\endfirsthead
+  \\hline
   \\caption{"""
             + port.descr.replace("_", "\\_")
             + """}
-  \\label{"""
+  \\endlastfoot
+
+  \\input """
+            + port.name
+            + """_if_tab
+\\end{xltabular}
+\\label{"""
             + port.name
             + """_if_tab:is}
-\\end{table}
+}
 """
         )
         if port.doc_clearpage:
             if_file.write("\\clearpage")
 
-    if_file.write("\\clearpage")
     if_file.close()
 
 

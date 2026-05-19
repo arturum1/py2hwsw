@@ -16,6 +16,7 @@ def conf_vh(macros, top_module, out_dir):
     :param top_module: top module name
     :param out_dir: output directory
     """
+    os.makedirs(out_dir, exist_ok=True)
     file2create = open(f"{out_dir}/{top_module}_conf.vh", "w")
     core_prefix = f"{top_module}_".upper()
 
@@ -69,10 +70,6 @@ def conf_vh(macros, top_module, out_dir):
             # If macro has 'doc_only' attribute set to True, skip it
             if macro.doc_only:
                 continue
-            if macro.if_defined:
-                file2create.write(f"`ifdef {macro.if_defined}\n")
-            if macro.if_not_defined:
-                file2create.write(f"`ifndef {macro.if_not_defined}\n")
 
             # Only insert macro if its is not a bool define, and if so only insert it if it is true
             if type(macro.val) is not bool:
@@ -82,10 +79,6 @@ def conf_vh(macros, top_module, out_dir):
             elif macro.val:
                 m_name = macro.name.upper()
                 file2create.write(f"`define {core_prefix}{m_name} 1\n")
-            if macro.if_defined or macro.if_not_defined:
-                file2create.write("`endif\n")
-
-    # file2create.write(f"\n`endif // VH_{fname}_VH\n")
 
 
 def conf_h(macros, top_module, out_dir):
@@ -183,54 +176,40 @@ The following tables describe the IP core configuration. The core may be configu
         for group in confs:
             confs_file.write(
                 """
-\\begin{table}[H]
-  \\centering
-  \\begin{tabularx}{\\textwidth}{|l|c|c|c|c|X|}
+{
+\\setlength{\\LTcapwidth}{\\linewidth} % make sure the caption takes up the whole linewidth
+\\begin{xltabular}{\\textwidth}{|l|c|c|c|c|X|}
 
-    \\hline
-    \\rowcolor{iob-green}
-    {\\bf Configuration} & {\\bf Type} & {\\bf Min} & {\\bf Typical} & {\\bf Max} & {\\bf Description} \\\\ \\hline \\hline
-
-    \\input """
-                + group.name
-                + """_confs_tab
-
-  \\end{tabularx}
+  \\hline
+  \\rowcolor{iob-green}
+  {\\bf Configuration} & {\\bf Type} & {\\bf Min} & {\\bf Typical} & {\\bf Max} & {\\bf Description} \\\\ \\hline \\hline
+  \\endfirsthead
+  \\hline
   \\caption{"""
                 + group.descr.replace("_", "\\_")
                 + """}
-  \\label{"""
+  \\endlastfoot
+
+  \\input """
+                + group.name
+                + """_confs_tab
+
+\\end{xltabular}
+\\label{"""
                 + group.name
                 + """_confs_tab:is}
-\\end{table}
+}
 """
             )
             if group.doc_clearpage:
                 confs_file.write("\\clearpage")
 
-    # Write info about "D" conf type
-    if "D" in conf_types:
         confs_file.write(
             """
-The parameters in the top-level Verilog module that are not listed above are
-called Derived Parameters. They are given as function of the primary parameters
-and should never be changed. They are used to simplify the definition of the
-interface and internal signals. The list of derived parameters is given below:
-\\input derived_params
+There may be other macros or generic parameters in the code that are not documented. They are typically derived from other primary macros or parameters or exist for documentation purposes.
 """
         )
 
-    # Write info about "C" conf type
-    if "C" in conf_types:
-        confs_file.write(
-            """
-There are also constants that are used in the core in order to improve the readability
-of the code and should not be changed. They are defined as presented in the list below:
-\\input constants
-"""
-        )
-
-    confs_file.write("\\clearpage")
     confs_file.close()
 
 
@@ -303,9 +282,22 @@ def generate_confs_tex(confs, out_dir):
                 constant[i] = str(constant[i]).replace("_", "\\_")
                 constant[i] = str(constant[i]).replace("$clog2", "log2")
             # write the line
-            file2create.write(
-                f"  \\item[{constant[0]}] {constant[2]} Value: {constant[1]}.\n"
-            )
+            if constant[0] == "VERSION":
+                # Version is special, it must have the version as a string after the value
+                # Remove the 16'h prefix and first 0 if present, add . before the last 2 digits and add V at the start
+                version = str(constant[1]).replace("16'h", "")
+                if version.startswith("0"):
+                    version = version[1:]
+                version = (
+                    version[:-2] + "." + version[-2:]
+                )  # Add . before last 2 digits
+                file2create.write(
+                    f"  \\item[{constant[0]}] {constant[2]} Value: {constant[1]} = V{version}.\n"
+                )
+            else:
+                file2create.write(
+                    f"  \\item[{constant[0]}] {constant[2]} Value: {constant[1]}.\n"
+                )
         file2create.write("\\end{description}\n")
 
 
@@ -318,4 +310,9 @@ def generate_confs(core):
         core.name,
         os.path.join(core.build_dir, core.dest_dir),
     )
-    conf_h(core.confs, core.name, core.build_dir + "/software/src")
+
+    sw_dest_dir = "software/src"
+    # Generate software sources in 'software/simulation/src' directory, if the core has a destination dir somewhere inside the hardware/simulation folder.
+    if core.dest_dir.startswith("hardware/simulation"):
+        sw_dest_dir = "software/simulation/src"
+    conf_h(core.confs, core.name, os.path.join(core.build_dir, sw_dest_dir))

@@ -4,10 +4,8 @@
 
 `timescale 1ns / 1ps
 
-`include "iob_axistream_in_csrs.vh"
 `include "iob_axistream_in_csrs_conf.vh"
 `include "iob_axistream_in_conf.vh"
-`include "iob_axistream_out_csrs.vh"
 `include "iob_axistream_out_csrs_conf.vh"
 `include "iob_axistream_out_conf.vh"
 
@@ -15,7 +13,6 @@
 `define IOB_NBYTES (DATA_W/8)
 `define IOB_GET_NBYTES(WIDTH) (WIDTH/8 + |(WIDTH%8))
 `define IOB_NBYTES_W $clog2(`IOB_NBYTES)
-`define IOB_WORD_ADDR(ADDR) ((ADDR>>`IOB_NBYTES_W)<<`IOB_NBYTES_W)
 
 `define IOB_BYTE_OFFSET(ADDR) (ADDR%(32/8))
 
@@ -69,7 +66,7 @@ module iob_axis_s_axi_m_tb;
    wire [(DATA_W/8)-1:0] axi_ram_ext_mem_w_strb;
    wire [(ADDR_W-2)-1:0] axi_ram_ext_mem_w_addr;
 
-   // AXI-4 full master I/F
+   // AXI-4 full manager I/F
    wire ram_axi_awid;  //Address write channel ID
    wire [ADDR_W-1:0] ram_axi_awaddr;  //Address write channel address
    wire [8-1:0] ram_axi_awlen;  //Address write channel burst length
@@ -450,15 +447,14 @@ module iob_axis_s_axi_m_tb;
       .sys_tdata_o          (axis_s_axi_m_axis_in_tdata),
       .sys_tvalid_o         (axis_in_valid),
       .sys_tready_i         (axis_in_ready),
-      // iob_csrs_cbus_s
-      .iob_csrs_iob_valid_i (axis_in_iob_valid),
-      .iob_csrs_iob_addr_i  (axis_in_iob_addr[`IOB_AXISTREAM_IN_CSRS_ADDR_W-1:2]),
-      .iob_csrs_iob_wdata_i (axis_in_iob_wdata),
-      .iob_csrs_iob_wstrb_i (axis_in_iob_wstrb),
-      .iob_csrs_iob_rvalid_o(axis_in_iob_rvalid),
-      .iob_csrs_iob_rdata_o (axis_in_iob_rdata),
-      .iob_csrs_iob_rready_i(axis_in_iob_rready),
-      .iob_csrs_iob_ready_o (axis_in_iob_ready)
+      // csrs_cbus_s
+      .csrs_iob_valid_i (axis_in_iob_valid),
+      .csrs_iob_addr_i  (axis_in_iob_addr),
+      .csrs_iob_wdata_i (axis_in_iob_wdata),
+      .csrs_iob_wstrb_i (axis_in_iob_wstrb),
+      .csrs_iob_rvalid_o(axis_in_iob_rvalid),
+      .csrs_iob_rdata_o (axis_in_iob_rdata),
+      .csrs_iob_ready_o (axis_in_iob_ready)
    );
 
    iob_axistream_out #(
@@ -485,15 +481,14 @@ module iob_axis_s_axi_m_tb;
       .sys_tdata_i          (axis_s_axi_m_axis_out_tdata),
       .sys_tvalid_i         (delayed_axis_out_valid),
       .sys_tready_o         (delayed_axis_out_ready),
-      // iob_csrs_cbus_s
-      .iob_csrs_iob_valid_i (axis_out_iob_valid),
-      .iob_csrs_iob_addr_i  (axis_out_iob_addr[`IOB_AXISTREAM_OUT_CSRS_ADDR_W-1:2]),
-      .iob_csrs_iob_wdata_i (axis_out_iob_wdata),
-      .iob_csrs_iob_wstrb_i (axis_out_iob_wstrb),
-      .iob_csrs_iob_rvalid_o(axis_out_iob_rvalid),
-      .iob_csrs_iob_rdata_o (axis_out_iob_rdata),
-      .iob_csrs_iob_rready_i(axis_out_iob_rready),
-      .iob_csrs_iob_ready_o (axis_out_iob_ready)
+      // csrs_cbus_s
+      .csrs_iob_valid_i (axis_out_iob_valid),
+      .csrs_iob_addr_i  (axis_out_iob_addr),
+      .csrs_iob_wdata_i (axis_out_iob_wdata),
+      .csrs_iob_wstrb_i (axis_out_iob_wstrb),
+      .csrs_iob_rvalid_o(axis_out_iob_rvalid),
+      .csrs_iob_rdata_o (axis_out_iob_rdata),
+      .csrs_iob_ready_o (axis_out_iob_ready)
    );
 
    iob_axi_ram #(
@@ -569,7 +564,7 @@ module iob_axis_s_axi_m_tb;
    //
    // Custom Tasks
    //
-   // Write data to AXIS IN IOb Native slave
+   // Write data to AXIS IN IOb Native subordinate
    task axis_in_iob_write;
       input [`IOB_AXISTREAM_IN_CSRS_ADDR_W-1:0] addr;
       input [31:0] data;
@@ -577,7 +572,7 @@ module iob_axis_s_axi_m_tb;
 
       begin
          @(posedge clk) #1 axis_in_iob_valid = 1;  //sync and assign
-         axis_in_iob_addr  = `IOB_WORD_ADDR(addr);
+         axis_in_iob_addr  = addr;
          axis_in_iob_wdata = `IOB_GET_WDATA(addr, data);
          axis_in_iob_wstrb = `IOB_GET_WSTRB(addr, width);
 
@@ -588,7 +583,7 @@ module iob_axis_s_axi_m_tb;
       end
    endtask
 
-   // Read data from AXIS IN IOb Native slave
+   // Read data from AXIS IN IOb Native subordinate
    task axis_in_iob_read;
       input [`IOB_AXISTREAM_IN_CSRS_ADDR_W-1:0] addr;
       output [31:0] data;
@@ -596,20 +591,18 @@ module iob_axis_s_axi_m_tb;
 
       begin
          @(posedge clk) #1 axis_in_iob_valid = 1;
-         axis_in_iob_addr  = `IOB_WORD_ADDR(addr);
+         axis_in_iob_addr  = addr;
          axis_in_iob_wstrb = 0;
 
          #1 while (!axis_in_iob_ready) #1;
          @(posedge clk) #1 axis_in_iob_valid = 0;
-         @(posedge clk) #1 axis_in_iob_rready = 1;
 
          while (!axis_in_iob_rvalid) #1;
          data = #1 `IOB_GET_RDATA(addr, axis_in_iob_rdata, width);
-         @(posedge clk) #1 axis_in_iob_rready = 0;
       end
    endtask
 
-   // Write data to AXIS OUT IOb Native slave
+   // Write data to AXIS OUT IOb Native subordinate
    task axis_out_iob_write;
       input [`IOB_AXISTREAM_OUT_CSRS_ADDR_W-1:0] addr;
       input [31:0] data;
@@ -617,7 +610,7 @@ module iob_axis_s_axi_m_tb;
 
       begin
          @(posedge clk) #1 axis_out_iob_valid = 1;  //sync and assign
-         axis_out_iob_addr  = `IOB_WORD_ADDR(addr);
+         axis_out_iob_addr  = addr;
          axis_out_iob_wdata = `IOB_GET_WDATA(addr, data);
          axis_out_iob_wstrb = `IOB_GET_WSTRB(addr, width);
 
@@ -628,7 +621,7 @@ module iob_axis_s_axi_m_tb;
       end
    endtask
 
-   // Read data from AXIS OUT IOb Native slave
+   // Read data from AXIS OUT IOb Native subordinate
    task axis_out_iob_read;
       input [`IOB_AXISTREAM_OUT_CSRS_ADDR_W-1:0] addr;
       output [31:0] data;
@@ -636,16 +629,14 @@ module iob_axis_s_axi_m_tb;
 
       begin
          @(posedge clk) #1 axis_out_iob_valid = 1;
-         axis_out_iob_addr  = `IOB_WORD_ADDR(addr);
+         axis_out_iob_addr  = addr;
          axis_out_iob_wstrb = 0;
 
          #1 while (!axis_out_iob_ready) #1;
          @(posedge clk) #1 axis_out_iob_valid = 0;
-         @(posedge clk) #1 axis_out_iob_rready = 1;
 
          while (!axis_out_iob_rvalid) #1;
          data = #1 `IOB_GET_RDATA(addr, axis_out_iob_rdata, width);
-         @(posedge clk) #1 axis_out_iob_rready = 0;
       end
    endtask
 
