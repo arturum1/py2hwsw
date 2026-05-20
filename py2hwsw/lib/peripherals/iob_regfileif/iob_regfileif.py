@@ -339,8 +339,9 @@ def get_manual_signals(name, mode, data_width):
         ]
     elif "W" in mode:
         signals += [
+            {"name": name + "_valid_o", "width": 1},
             {"name": name + "_wdata_o", "width": data_width},
-            {"name": name + "_wen_o", "width": 1},
+            {"name": name + "_wstrb_o", "width": f"({data_width})/8"},
             {"name": name + "_wready_i", "width": 1},
         ]
 
