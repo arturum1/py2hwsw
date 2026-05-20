@@ -98,17 +98,25 @@ def append_board_wrappers(attributes_dict, params):
         "iob_smart_zynq_sl": "vivado",
         "iob_basys3": "vivado",
     }
+    # Add wrapper superblock for each board in board_list
     for board in attributes_dict.get("board_list", []):
         tool = tools[board]
-        attributes_dict["superblocks"].append(
-            {
-                "core_name": "iob_system_" + board,
-                "instance_name": "iob_system_" + board,
-                "instance_description": f"FPGA wrapper for {board}",
-                "dest_dir": f"hardware/fpga/{tool}/{board}",
-                "iob_system_params": params,
-            },
-        )
+
+        # Dont append if wrapper superblock already added (for example added by child core)
+        for block in attributes_dict["superblocks"]:
+            if block["instance_name"] == "iob_system_" + board:
+                break
+        else:
+            # Did not find existing wrapper superblock. Append new one.
+            attributes_dict["superblocks"].append(
+                {
+                    "core_name": "iob_system_" + board,
+                    "instance_name": "iob_system_" + board,
+                    "instance_description": f"FPGA wrapper for {board}",
+                    "dest_dir": f"hardware/fpga/{tool}/{board}",
+                    "iob_system_params": params,
+                },
+            )
 
 
 def handle_system_overrides(attributes_dict, py_params):
