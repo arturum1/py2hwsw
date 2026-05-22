@@ -2,16 +2,17 @@
 #
 # SPDX-License-Identifier: MIT
 
+# IOb_System_Linux specific makefile segment (level 1 child - child of iob_system)
 
 ### Launch minicom if running Linux
 # pass CI variable over ssh commands
 UFLAGS+=CI=$(CI)
 ifeq ($(RUN_LINUX),1)
-# Check if minicom test script exists
-ifneq ($(wildcard minicom_linux_script.txt),)
-SCRIPT_STR:=-S minicom_linux_script.txt
+MINICOM_SCRIPT ?=minicom_linux_script.txt
+
+SCRIPT_STR=-S $(MINICOM_SCRIPT)
 # Set TERM variable to linux-c-nc (needed to run in non-interactive mode https://stackoverflow.com/a/49077622)
-TERM_STR:=TERM=linux-c-nc
+TERM_STR=TERM=linux-c-nc
 # Give fake stdout to minicom on CI (continuous integration), as it does not have any available (based on https://www.linuxquestions.org/questions/linux-general-1/capuring-data-with-minicom-over-tty-interface-4175558631/#post5448734)
 # Run minicom process in background for Github Actions and wait for minicom to
 # finish so that board_client does not finish as soon as minicom goes to
@@ -24,7 +25,7 @@ else # CI is not set
 FAKE_STDOUT:=
 RUN_MINICOM_IN_BACKGROUND:=
 endif # CI
-endif # minicom_linux_script.txt
+
 # Set a capture file and print its contents (to work around minicom clearing the screen)
 LOG_STR:=-C minicom_out.log $(FAKE_STDOUT) || cat minicom_out.log
 # Set HOME to current (fpga) directory (needed because minicom always reads the '.minirc.*' config file from HOME)
@@ -35,7 +36,7 @@ CONSOLE_CMD +=$(PYTHON_DIR)/console.py -s $(BOARD_SERIAL_PORT) && (($(HOME_STR) 
 endif # RUN_LINUX
 
 
-# include fpga build segment of child systems
+# include fpga build segment of (level 2) child systems
 # child systems can add their own child2_fpga_build.mk without having to override this one.
 ifneq ($(wildcard child2_fpga_build.mk),)
 include child2_fpga_build.mk

@@ -17,10 +17,10 @@
 void dma_init(uint32_t addr);
 
 // Start a DMA write transfer
-void dma_write_transfer(uint32_t *base_addr, uint32_t size);
+void dma_write_transfer(uint32_t phys_addr, uint32_t size);
 
 // Start a DMA read transfer
-void dma_read_transfer(uint32_t *base_addr, uint32_t size);
+void dma_read_transfer(uint32_t phys_addr, uint32_t size);
 
 uint8_t dma_write_busy();
 

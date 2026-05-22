@@ -281,7 +281,7 @@ def setup(py_params_dict):
                 "signals": [
                     {"name": "w_length_valid_wr", "width": 1},
                     {"name": "w_length_wdata_wr"},
-                    {"name": "w_length_wstrb_wr", "width": "WLEN_W/8"},  # Unused
+                    {"name": "w_length_wstrb_wr", "width": "WLEN_W/8"},
                     {"name": "w_length_ready_wr", "width": 1},
                 ],
             },
@@ -298,7 +298,7 @@ def setup(py_params_dict):
                 "signals": [
                     {"name": "w_start_valid_wr", "width": 1},
                     {"name": "w_start_wdata_wr", "width": 1},
-                    {"name": "w_start_wstrb_wr", "width": 1},  # Unused
+                    {"name": "w_start_wstrb_wr", "width": 1},
                     {"name": "w_start_ready_wr", "width": 1},
                 ],
             },
@@ -343,7 +343,7 @@ def setup(py_params_dict):
                 "signals": [
                     {"name": "r_start_valid_wr", "width": 1},
                     {"name": "r_start_wdata_wr", "width": 1},
-                    {"name": "r_start_wstrb_wr", "width": 1},  # Unused
+                    {"name": "r_start_wstrb_wr", "width": 1},
                     {"name": "r_start_ready_wr", "width": 1},
                 ],
             },
@@ -610,9 +610,9 @@ def setup(py_params_dict):
     assign w_start_ready_wr = 1'b1;
     assign r_start_ready_wr = 1'b1;
 
-    assign w_length_wen_wr = w_length_valid_wr & w_length_ready_wr;
-    assign w_start_wen_wr = w_start_valid_wr & w_start_ready_wr;
-    assign r_start_wen_wr = r_start_valid_wr & r_start_ready_wr;
+    assign w_length_wen_wr = w_length_valid_wr & |w_length_wstrb_wr & w_length_ready_wr;
+    assign w_start_wen_wr = w_start_valid_wr & |w_start_wstrb_wr & w_start_ready_wr;
+    assign r_start_wen_wr = r_start_valid_wr & |r_start_wstrb_wr & r_start_ready_wr;
 
     assign w_bursttype_wr = 2'b01;
     assign r_bursttype_wr = 2'b01;

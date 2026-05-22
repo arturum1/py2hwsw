@@ -313,7 +313,11 @@ def setup(py_params: dict):
                 attributes_dict[item] = []
             attributes_dict[item].extend(value)
         else:  # Override value
-            print("[iob_system_linx] Derived core of iob_system_linux is overriding attribute: " + item, file=sys.stderr)
+            print(
+                "[iob_system_linx] Derived core of iob_system_linux is overriding attribute: "
+                + item,
+                file=sys.stderr,
+            )
             attributes_dict[item] = value
 
     # Iob_system_linux is actually a derived core of iob_system. Therefore, set iob_system as the parent core and pass iob_system_linux's attributes_dict as a python paremter.

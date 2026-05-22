@@ -9,30 +9,24 @@
 // DMA functions
 
 // Initialize Base Address
-void dma_init(uint32_t addr) {
-  iob_dma_csrs_init_baseaddr(addr);
-}
+void dma_init(uint32_t addr) { iob_dma_csrs_init_baseaddr(addr); }
 
 // Start a DMA write transfer
 // Write to memory
-// base_addr: Base address of external memory to start the data transfer.
+// phys_addr: Physical address of external memory to start the data transfer.
 // size: Amount of 32-bit words to transfer.
-void dma_write_transfer(uint32_t *base_addr, uint32_t size) {
-  // cast to uintptr_t to avoid compilation error in 64bit machines
-  // example: when running verilator simulation
-  iob_dma_csrs_set_w_addr((uint32_t)(uintptr_t)base_addr);
+void dma_write_transfer(uint32_t phys_addr, uint32_t size) {
+  iob_dma_csrs_set_w_addr(phys_addr);
   iob_dma_csrs_set_w_length(size);
   iob_dma_csrs_set_w_start(1);
 }
 
 // Start a DMA read transfer
 // Read from memory
-// base_addr: Base address of external memory to start the data transfer.
+// phys_addr: Physical address of external memory to start the data transfer.
 // size: Amount of 32-bit words to transfer.
-void dma_read_transfer(uint32_t *base_addr, uint32_t size) {
-  // cast to uintptr_t to avoid compilation error in 64bit machines
-  // example: when running verilator simulation
-  iob_dma_csrs_set_r_addr((uint32_t)(uintptr_t)base_addr);
+void dma_read_transfer(uint32_t phys_addr, uint32_t size) {
+  iob_dma_csrs_set_r_addr(phys_addr);
   iob_dma_csrs_set_r_length(size);
   iob_dma_csrs_set_r_start(1);
 }
