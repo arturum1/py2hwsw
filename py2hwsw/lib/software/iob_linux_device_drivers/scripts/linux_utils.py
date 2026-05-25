@@ -106,5 +106,4 @@ def evaluate_peripheral_csrs_widths(peripheral):
             csr["n_bits"], peripheral["confs"], "max"
         )
 
-    print(evaluated_peripheral)
     return evaluated_peripheral
