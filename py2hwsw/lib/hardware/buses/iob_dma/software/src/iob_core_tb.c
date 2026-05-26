@@ -72,7 +72,7 @@ int iob_core_tb() {
   // 2. Configure AXIS IN -> DMA -> AXI RAM write operation
   printf("2.1. Configure DMA write transfer\n");
   iob_dma_csrs_set_w_burstlen(100);
-  dma_write_transfer((uint32_t *)RAM_ADDR, NWORDS);
+  dma_write_transfer((uint32_t)(uintptr_t)RAM_ADDR, NWORDS);
 
   // 3. Wait for DMA transfer complete
   printf("3. Wait for DMA write transfer complete...");
@@ -96,7 +96,7 @@ int iob_core_tb() {
 
   printf("4.3. Configure DMA read transfer\n");
   iob_dma_csrs_set_r_burstlen(200);
-  dma_read_transfer((uint32_t *)RAM_ADDR, NWORDS);
+  dma_read_transfer((uint32_t)(uintptr_t)RAM_ADDR, NWORDS);
 
   // 5. Wait for DMA transfer complete
   printf("5. Wait for DMA read transfer complete...");

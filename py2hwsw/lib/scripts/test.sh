@@ -11,15 +11,25 @@ TBS=`find ${LIB_DIR} | grep _tb.v | grep -v include | grep -v submodules`
 
 FILTER_OUT_TBS=""
 #for debug
-#FILTER_OUT_TBS="iob_system_tb.v iob_uart_tb.v iob_div_subshift_tb.v iob_div_subshift_frac_tb.v iob_div_pipe_tb.v iob_and_tb.v iob_aoi_tb.v iob_csrs_demo_tb.v iob_pulse_gen_tb.v iob_ctls_tb.v iob_prio_enc_tb.v iob_shift_reg_tb.v iob_timer_tb.v iob_nco_tb.v iob_ram_t2p_be_tb.v iob_ram_2p_tb.v iob_ram_tdp_tb.v iob_ram_atdp_be_tb.v iob_ram_tdp_be_xil_tb.v iob_ram_2p_tb.v iob_ram_tdp_tb.v iob_ram_atdp_be_tb.v iob_ram_t2p_tb.v iob_ram_sp_se_tb.v iob_ram_sp_tb.v iob_ram_t2p_tiled_tb.v iob_ram_atdp_tb.v iob_ram_sp_be_tb.v iob_ram_tdp_be_tb.v iob_ram_at2p_tb.v iob_ram_tdp_tb.v iob_rom_sp_tb.v iob_rom_atdp_tb.v iob_regarray_sp_tb.v iob_rom_tdp_tb.v iob_rom_2p_tb.v iob_axis2axi_tb.v iob_fifo_async_tb.v iob_fifo_sync_tb.v"
+#FILTER_OUT_TBS="iob_div_pipe iob_div_subshift iob_div_subshift_frac iob_ctls iob_prio_enc iob_and iob_aoi iob_csrs_demo iob_axis2ahb iob_iob_s_axi_m iob_dma iob_pulse_gen iob_fifo_async iob_fifo_sync iob_ram_2p iob_ram_at2p iob_ram_atdp iob_ram_atdp_be iob_ram_sp iob_ram_sp_be iob_ram_sp_se iob_ram_t2p iob_ram_t2p_be iob_ram_t2p_tiled iob_ram_tdp iob_ram_tdp_be iob_ram_tdp_be_xil iob_rom_2p iob_rom_atdp iob_rom_sp iob_rom_tdp iob_regarray_sp iob_shift_reg iob_system iob_system_linux iob_axistream_in iob_macc iob_timer iob_uart"
 
-TBS_FILTERED=""
-for i in $TBS; do
-    # Filter out testbenches from $FILTER_OUT_TBS list
-    if ! echo $FILTER_OUT_TBS | grep -q `basename $i` ; then
-        TBS_FILTERED+=" $i";
+TBS_FILTERED=()
+
+# Filter out Testbenches from cores specified in FILTER_OUT_TBS
+for tb in $TBS; do
+  skip=0
+  for f in $FILTER_OUT_TBS; do
+    if [[ $tb == *"$f/hardware/simulation"* ]]; then
+      skip=1
+      break
     fi
+  done
+
+  [[ $skip -eq 0 ]] && TBS_FILTERED+=("$tb")
 done
+
+# If you want it as a space-separated string:
+TBS_FILTERED="${TBS_FILTERED[*]}"
 
 echo $TBS_FILTERED
 
