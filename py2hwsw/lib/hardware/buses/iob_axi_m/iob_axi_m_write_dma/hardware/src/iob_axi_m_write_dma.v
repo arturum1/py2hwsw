@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 IObundle
+//
+// SPDX-License-Identifier: MIT
+
 `timescale 1ns / 1ps
 
 module iob_axi_m_write_dma #(

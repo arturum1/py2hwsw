@@ -1,10 +1,8 @@
 #!/bin/sh
 
-# SPDX-FileCopyrightText: 2026 IObundle, Lda
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
-#
-# Py2HWSW Version 0.81.0 has generated this code (https://github.com/IObundle/py2hwsw).
 
 echo "Verify that CLINT (RISC-V timer) interrupts triggered (interrupt count > 0)"
 
