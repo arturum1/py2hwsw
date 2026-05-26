@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -301,6 +301,24 @@ def setup(py_params: dict):
         ],
         "snippets": [{"verilog_code": verilog_snippet}],
     }
+
+    # Merge system attributes from derived cores
+    for item, value in py_params.pop("system_attributes", {}).items():
+        if type(value) == dict:  # Append elements to dictionary
+            if item not in attributes_dict:
+                attributes_dict[item] = {}
+            attributes_dict[item].update(value)
+        elif type(value) == list:  # Extend list
+            if item not in attributes_dict:
+                attributes_dict[item] = []
+            attributes_dict[item].extend(value)
+        else:  # Override value
+            print(
+                "[iob_system_linx] Derived core of iob_system_linux is overriding attribute: "
+                + item,
+                file=sys.stderr,
+            )
+            attributes_dict[item] = value
 
     # Iob_system_linux is actually a derived core of iob_system. Therefore, set iob_system as the parent core and pass iob_system_linux's attributes_dict as a python paremter.
     attributes_dict = {

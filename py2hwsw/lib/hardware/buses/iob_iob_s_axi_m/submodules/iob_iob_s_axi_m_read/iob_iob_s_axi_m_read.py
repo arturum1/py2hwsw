@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -99,6 +99,7 @@ def setup(py_params_dict):
                     "ADDR_W": "AXI_ADDR_W",
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
+                    "PROT_W": 3,
                 },
             },
             {
@@ -120,6 +121,20 @@ def setup(py_params_dict):
                     {"name": "clk_i"},
                     {"name": "cke_i"},
                     {"name": "arst_i"},
+                    {"name": "rst_i"},
+                ],
+            },
+            {
+                "name": "axis2axi_clk",
+                "signals": [
+                    {"name": "clk_i"},
+                    {"name": "cke_i"},
+                    {"name": "arst_i"},
+                ],
+            },
+            {
+                "name": "axis2axi_rst",
+                "signals": [
                     {"name": "rst_i"},
                 ],
             },
@@ -171,10 +186,12 @@ def setup(py_params_dict):
                 "name": "axis_s_axi_m_config_read_if",
                 "descr": "AXI read burst converter to AXI-Stream configuration interface",
                 "signals": [
-                    {"name": "start_addr_i", "width": "AXI_ADDR_W"},
-                    {"name": "length_i", "width": "(AXI_LEN_W+1)"},
-                    {"name": "start_transfer_i"},
+                    {"name": "r_addr_protocol", "width": "AXI_ADDR_W"},
+                    {"name": "r_length_protocol", "width": "AXI_LEN_W"},
+                    {"name": "r_start_protocol"},
+                    {"name": "r_burst_type", "width": 2},
                     {"name": "read_busy"},
+                    {"name": "r_resp", "width": 2},
                 ],
             },
         ],
@@ -231,8 +248,8 @@ def setup(py_params_dict):
                 },
             },
             {
-                "core_name": "iob_axis_s_axi_m_read_int",
-                "instance_name": "axis_s_axi_m_read_inst",
+                "core_name": "iob_axis_m_axi_m_read",
+                "instance_name": "axis_m_axi_m_read_inst",
                 "instance_description": "AXI read burst to AXI-Stream converter",
                 "parameters": {
                     "AXI_ADDR_W": "AXI_ADDR_W",
@@ -241,8 +258,9 @@ def setup(py_params_dict):
                     "AXI_ID_W": "AXI_ID_W",
                 },
                 "connect": {
-                    "clk_en_rst_s": "clk_w_rst_ref",
-                    "config_read_io": "axis_s_axi_m_config_read_if",
+                    "clk_en_rst_s": "axis2axi_clk",
+                    "rst_i": "axis2axi_rst",
+                    "config_io": "axis_s_axi_m_config_read_if",
                     "axis_out_io": "axi2axis_signals",
                     "axi_read_m": "axi_read_m",
                 },
@@ -252,6 +270,7 @@ def setup(py_params_dict):
             "type": "fsm",
             "default_assignments": """
         // Default assignments
+        r_burst_type = 2'b01;
         busy_o = 1'b0;
         en_fifo2axis = 1'b0;
         """,
@@ -276,6 +295,15 @@ def setup(py_params_dict):
             end
         """,
         },
+        "snippets": [
+            {
+                "verilog_code": """
+    assign r_addr_protocol = start_addr_i;
+    assign r_length_protocol = length_i - 1'b1;
+    assign r_start_protocol = start_transfer_i;
+                """
+            }
+        ],
     }
 
     return attributes_dict

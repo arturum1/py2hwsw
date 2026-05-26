@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -433,8 +433,8 @@ def setup(py_params_dict):
                 },
                 "connect": {
                     "clk_en_rst_s": "sync_clk_en_rst_s",
-                    "counter_rst_i": "sync_rst",
-                    "counter_en_i": "w_en_int",
+                    "rst_i": "sync_rst",
+                    "en_i": "w_en_int",
                     "data_o": "w_addr",
                 },
             },
@@ -447,8 +447,8 @@ def setup(py_params_dict):
                 },
                 "connect": {
                     "clk_en_rst_s": "sync_clk_en_rst_s",
-                    "counter_rst_i": "sync_rst",
-                    "counter_en_i": "r_en_int",
+                    "rst_i": "sync_rst",
+                    "en_i": "r_en_int",
                     "data_o": "r_addr",
                 },
             },

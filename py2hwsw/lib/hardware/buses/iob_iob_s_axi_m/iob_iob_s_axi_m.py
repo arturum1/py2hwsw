@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -164,6 +164,7 @@ def setup(py_params_dict):
             "descr": "AXI write interface",
             "signals": [
                 {"name": "m_axi_awaddr_o", "width": "AXI_ADDR_W"},
+                {"name": "m_axi_awprot_o", "width": 3},
                 {"name": "m_axi_awvalid_o"},
                 {"name": "m_axi_awready_i"},
                 {"name": "m_axi_wdata_o", "width": "AXI_DATA_W"},
@@ -229,6 +230,7 @@ def setup(py_params_dict):
             "descr": "AXI read interface",
             "signals": [
                 {"name": "m_axi_araddr_o", "width": "AXI_ADDR_W"},
+                {"name": "m_axi_arprot_o", "width": 3},
                 {"name": "m_axi_arvalid_o"},
                 {"name": "m_axi_arready_i"},
                 {"name": "m_axi_rdata_i", "width": "AXI_DATA_W"},

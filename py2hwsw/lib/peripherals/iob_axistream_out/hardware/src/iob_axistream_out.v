@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 IObundle
+// SPDX-FileCopyrightText: 2026 IObundle
 //
 // SPDX-License-Identifier: MIT
 
@@ -111,13 +111,13 @@ module iob_axistream_out #(
       .DATA_W (1),
       .RST_VAL(1'd0)
    ) tvalid_reg (
-      .clk_i (axis_clk_i),
-      .cke_i (axis_cke_i),
-      .arst_i(axis_arst_i),
-      .rst_i (axis_sw_rst),
-      .en_i  (axis_sw_enable),
-      .data_i(axis_pc_nxt),
-      .data_o(axis_pc)
+       .clk_i (axis_clk_i),
+       .cke_i (axis_cke_i),
+       .arst_i(axis_arst_i),
+       .rst_i (axis_sw_rst),
+       .en_i  (axis_sw_enable),
+       .data_i(axis_pc_nxt),
+       .data_o(axis_pc)
    );
 
    // sent words counter
@@ -125,12 +125,12 @@ module iob_axistream_out #(
       .DATA_W (DATA_W),
       .RST_VAL({DATA_W{1'd0}})
    ) word_count_inst (
-      .clk_i        (axis_clk_i),
-      .cke_i        (axis_cke_i),
-      .arst_i       (axis_arst_i),
-      .counter_rst_i(axis_sw_rst),
-      .counter_en_i (axis_fifo_read),
-      .data_o       (axis_word_count)
+       .clk_i (axis_clk_i),
+       .cke_i (axis_cke_i),
+       .arst_i(axis_arst_i),
+       .rst_i (axis_sw_rst),
+       .en_i  (axis_fifo_read),
+       .data_o(axis_word_count)
    );
 
 
@@ -139,30 +139,30 @@ module iob_axistream_out #(
       .DATA_W (1),
       .RST_VAL(1'd0)
    ) sw_rst (
-      .clk_i   (axis_clk_i),
-      .arst_i  (axis_arst_i),
-      .signal_i(soft_reset_wr),
-      .signal_o(axis_sw_rst)
+       .clk_i   (axis_clk_i),
+       .arst_i  (axis_arst_i),
+       .signal_i(soft_reset_wr),
+       .signal_o(axis_sw_rst)
    );
 
    iob_sync #(
       .DATA_W (1),
       .RST_VAL(1'd0)
    ) sw_enable (
-      .clk_i   (axis_clk_i),
-      .arst_i  (axis_arst_i),
-      .signal_i(enable_wr),
-      .signal_o(axis_sw_enable)
+       .clk_i   (axis_clk_i),
+       .arst_i  (axis_arst_i),
+       .signal_i(enable_wr),
+       .signal_o(axis_sw_enable)
    );
 
    iob_sync #(
       .DATA_W (DATA_W),
       .RST_VAL(0)
    ) fifo_threshold (
-      .clk_i   (axis_clk_i),
-      .arst_i  (axis_arst_i),
-      .signal_i(nwords_wr),
-      .signal_o(axis_nwords)
+       .clk_i   (axis_clk_i),
+       .arst_i  (axis_arst_i),
+       .signal_i(nwords_wr),
+       .signal_o(axis_nwords)
    );
 
    //FIFOs RAMs
@@ -174,15 +174,15 @@ module iob_axistream_out #(
             .DATA_W(TDATA_W),
             .ADDR_W(RAM_ADDR_W)
          ) iob_ram_at2p (
-            .w_clk_i (ext_mem_w_clk),
-            .w_en_i  (ext_mem_w_en[p]),
-            .w_addr_i(ext_mem_w_addr),
-            .w_data_i(ext_mem_w_data[p*TDATA_W+:TDATA_W]),
+             .w_clk_i (ext_mem_w_clk),
+             .w_en_i  (ext_mem_w_en[p]),
+             .w_addr_i(ext_mem_w_addr),
+             .w_data_i(ext_mem_w_data[p*TDATA_W+:TDATA_W]),
 
-            .r_clk_i (ext_mem_r_clk),
-            .r_en_i  (ext_mem_r_en[p]),
-            .r_addr_i(ext_mem_r_addr),
-            .r_data_o(ext_mem_r_data[p*TDATA_W+:TDATA_W])
+             .r_clk_i (ext_mem_r_clk),
+             .r_en_i  (ext_mem_r_en[p]),
+             .r_addr_i(ext_mem_r_addr),
+             .r_data_o(ext_mem_r_data[p*TDATA_W+:TDATA_W])
          );
       end
    endgenerate
@@ -193,36 +193,36 @@ module iob_axistream_out #(
       .R_DATA_W(TDATA_W),
       .ADDR_W  (FIFO_ADDR_W)
    ) data_fifo (
-      //memory write port
-      .ext_mem_w_clk_o (ext_mem_w_clk),
-      .ext_mem_w_en_o  (ext_mem_w_en),
-      .ext_mem_w_addr_o(ext_mem_w_addr),
-      .ext_mem_w_data_o(ext_mem_w_data),
-      //memory read port
-      .ext_mem_r_clk_o (ext_mem_r_clk),
-      .ext_mem_r_en_o  (ext_mem_r_en),
-      .ext_mem_r_addr_o(ext_mem_r_addr),
-      .ext_mem_r_data_i(ext_mem_r_data),
-      //read port (axis clk domain)
-      .r_clk_i         (axis_clk_i),
-      .r_cke_i         (axis_cke_i),
-      .r_arst_i        (axis_arst_i),
-      .r_rst_i         (axis_sw_rst),
-      .r_en_i          (axis_fifo_read),
-      .r_data_o        (axis_tdata),
-      .r_empty_o       (axis_fifo_empty),
-      .r_full_o        (),
-      .r_level_o       (),
-      //write port (sys clk domain)
-      .w_clk_i         (clk_i),
-      .w_cke_i         (cke_i),
-      .w_arst_i        (arst_i),
-      .w_rst_i         (soft_reset_wr),
-      .w_en_i          (fifo_write),
-      .w_data_i        (fifo_wdata),
-      .w_empty_o       (fifo_empty_rd),
-      .w_full_o        (fifo_full_rd),
-      .w_level_o       (fifo_level_rd)
+       //memory write port
+       .ext_mem_w_clk_o (ext_mem_w_clk),
+       .ext_mem_w_en_o  (ext_mem_w_en),
+       .ext_mem_w_addr_o(ext_mem_w_addr),
+       .ext_mem_w_data_o(ext_mem_w_data),
+       //memory read port
+       .ext_mem_r_clk_o (ext_mem_r_clk),
+       .ext_mem_r_en_o  (ext_mem_r_en),
+       .ext_mem_r_addr_o(ext_mem_r_addr),
+       .ext_mem_r_data_i(ext_mem_r_data),
+       //read port (axis clk domain)
+       .r_clk_i         (axis_clk_i),
+       .r_cke_i         (axis_cke_i),
+       .r_arst_i        (axis_arst_i),
+       .r_rst_i         (axis_sw_rst),
+       .r_en_i          (axis_fifo_read),
+       .r_data_o        (axis_tdata),
+       .r_empty_o       (axis_fifo_empty),
+       .r_full_o        (),
+       .r_level_o       (),
+       //write port (sys clk domain)
+       .w_clk_i         (clk_i),
+       .w_cke_i         (cke_i),
+       .w_arst_i        (arst_i),
+       .w_rst_i         (soft_reset_wr),
+       .w_en_i          (fifo_write),
+       .w_data_i        (fifo_wdata),
+       .w_empty_o       (fifo_empty_rd),
+       .w_full_o        (fifo_full_rd),
+       .w_level_o       (fifo_level_rd)
    );
 
 endmodule
