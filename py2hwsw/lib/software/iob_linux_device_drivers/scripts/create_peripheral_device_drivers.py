@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -10,7 +10,7 @@ from math import ceil
 from create_peripheral_tests import create_peripheral_tests
 from create_device_tree_files import create_device_tree_files
 from create_driver_documentation import create_driver_documentation
-from linux_utils import csr_type
+from linux_utils import csr_type, evaluate_peripheral_csrs_widths
 
 SPDX_PREFIX = "SPDX-"
 
@@ -141,7 +141,7 @@ def create_dev_user_csrs_source(path, peripheral):
 """
         + """\
 
-uint32_t read_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t *value) {
+static uint32_t read_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t *value) {
   ssize_t ret = -1;
 
   if (fd == 0) {
@@ -192,7 +192,7 @@ uint32_t read_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t *value) {
   return ret;
 }
 
-uint32_t write_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t value) {
+static uint32_t write_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t value) {
   ssize_t ret = -1;
 
   if (fd == 0) {
@@ -237,7 +237,7 @@ uint32_t write_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t value) {
 
 """
         + f"""\
-int fd = 0;
+static int fd = 0;
 
 void {peripheral['name']}_csrs_init_baseaddr(uint32_t addr) {{
   fd = open({peripheral['upper_name']}_DEVICE_FILE, O_RDWR);
@@ -312,7 +312,7 @@ def create_ioctl_user_csrs_source(path, peripheral):
     )
 
     content += f"""\
-int fd = 0;
+static int fd = 0;
 
 void {peripheral['name']}_csrs_init_baseaddr(uint32_t addr) {{
   fd = open({peripheral['upper_name']}_DEVICE_FILE, O_RDWR);
@@ -972,7 +972,7 @@ static ssize_t {peripheral['name']}_read(struct file *file, char __user *buf, si
     break;
 """
 
-    if peripheral.get("support_interrupt", False):
+    if peripheral["support_interrupt"]:
         content += f"""\
   case {peripheral['upper_name']}_INTERRUPT_ADDR:
     {peripheral['name']}_irq_received = 0;
@@ -1055,10 +1055,20 @@ static loff_t {peripheral['name']}_llseek(struct file *filp, loff_t offset, int 
   default:
     return -EINVAL;
   }}
+"""
 
+    if peripheral["support_interrupt"]:
+        content += f"""\
   // Check for valid bounds
   if (new_pos < 0 || (new_pos > {peripheral['name']}_data.regsize && 
                      new_pos != {peripheral['upper_name']}_INTERRUPT_ADDR)) {{
+"""
+    else:
+        content += f"""\
+  // Check for valid bounds
+  if (new_pos < 0 || new_pos > {peripheral['name']}_data.regsize) {{
+"""
+    content += f"""\
     return -EINVAL;
   }}
 
@@ -1264,6 +1274,7 @@ def generate_device_drivers(
         "spdx_year": license_year,
         "spdx_license": license_name,
         "license": f"Dual {license_name}/GPL",
+        "confs": peripheral.get("confs", []),  # Used to eval parameters on CSRs
         "csrs": csrs_list,
         "support_interrupt": support_interrupt,
         "compatible_str": (
@@ -1289,9 +1300,18 @@ def generate_device_drivers(
         os.path.join(drivers_output_dir, "drivers"), _peripheral
     )
     create_driver_main_file(os.path.join(drivers_output_dir, "drivers"), _peripheral)
-    create_sysfs_user_csrs_source(os.path.join(drivers_output_dir, "user"), _peripheral)
-    create_dev_user_csrs_source(os.path.join(drivers_output_dir, "user"), _peripheral)
-    create_ioctl_user_csrs_source(os.path.join(drivers_output_dir, "user"), _peripheral)
+
+    _evaluated_peripheral = evaluate_peripheral_csrs_widths(_peripheral)
+    create_sysfs_user_csrs_source(
+        os.path.join(drivers_output_dir, "user"), _evaluated_peripheral
+    )
+    create_dev_user_csrs_source(
+        os.path.join(drivers_output_dir, "user"), _evaluated_peripheral
+    )
+    create_ioctl_user_csrs_source(
+        os.path.join(drivers_output_dir, "user"), _evaluated_peripheral
+    )
+
     create_user_makefile(os.path.join(drivers_output_dir, "user"), _peripheral)
     create_peripheral_tests(os.path.join(drivers_output_dir, "user"), _peripheral)
     create_device_tree_files(drivers_output_dir, _peripheral, dts_extra_properties)

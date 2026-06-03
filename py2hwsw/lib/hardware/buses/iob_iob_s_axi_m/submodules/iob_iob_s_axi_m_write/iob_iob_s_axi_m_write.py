@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -103,6 +103,7 @@ def setup(py_params_dict):
                     "ADDR_W": "AXI_ADDR_W",
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
+                    "PROT_W": 3,
                 },
             },
             {
@@ -167,14 +168,36 @@ def setup(py_params_dict):
                 ],
             },
             {
+                "name": "axis2axi_clk_if",
+                "signals": [
+                    {"name": "clk_i"},
+                    {"name": "cke_i"},
+                    {"name": "arst_i"},
+                ],
+            },
+            {
+                "name": "axis2axi_rst_i",
+                "signals": [
+                    {"name": "rst_i"},
+                ],
+            },
+            {
                 "name": "axis_s_axi_m_config_write_if",
                 "descr": "AXI-Stream to AXI write burst converter configuration interface",
                 "signals": [
-                    {"name": "start_addr_i", "width": "AXI_ADDR_W"},
-                    {"name": "length_i", "width": "(AXI_LEN_W+1)"},
-                    {"name": "wstrb_int", "width": "WSTRB_W", "isvar": True},
-                    {"name": "start_transfer"},
+                    {"name": "w_addr_protocol", "width": "AXI_ADDR_W"},
+                    {"name": "w_length_protocol", "width": "AXI_LEN_W"},
+                    {"name": "w_start_protocol"},
+                    # {"name": "wstrb_int", "width": "WSTRB_W", "isvar": True},
+                    {"name": "w_burst_type", "width": 2},
                     {"name": "write_busy"},
+                    {"name": "w_resp", "width": 2},
+                ],
+            },
+            {
+                "name": "internal_wires",
+                "signals": [
+                    {"name": "start_transfer", "width": 1},
                 ],
             },
         ],
@@ -218,7 +241,7 @@ def setup(py_params_dict):
                 },
             },
             {
-                "core_name": "iob_axis_s_axi_m_write_int",
+                "core_name": "iob_axis_s_axi_m_write",
                 "instance_name": "axis_s_axi_m_write_inst",
                 "instance_description": "AXI-Stream to AXI write burst converter",
                 "parameters": {
@@ -228,8 +251,9 @@ def setup(py_params_dict):
                     "AXI_ID_W": "AXI_ID_W",
                 },
                 "connect": {
-                    "clk_en_rst_s": "fifo2axis_clk_if",
-                    "config_write_io": "axis_s_axi_m_config_write_if",
+                    "clk_en_rst_s": "axis2axi_clk_if",
+                    "rst_i": "axis2axi_rst_i",
+                    "config_io": "axis_s_axi_m_config_write_if",
                     "axis_in_io": "internal_axis_signals",
                     "axi_write_m": "axi_write_m",
                 },
@@ -238,12 +262,13 @@ def setup(py_params_dict):
         "fsm": {
             "type": "fsm",
             "default_assignments": """
+        w_burst_type = 2'b01;
         fifo_wen = |write_strobe_i;
         // Default assignments
         start_transfer = 1'b0;
         busy_o = 1'b0;
         en_fifo2axis = 1'b0;
-        wstrb_int = {WSTRB_W{1'b0}};
+        //wstrb_int = {WSTRB_W{1'b0}};
         """,
             "state_descriptions": """
         WAIT_DATA: // Start transfer when enough data is available in the FIFO
@@ -257,12 +282,21 @@ def setup(py_params_dict):
         TRANSF_DATA: // Transfer data
             busy_o = 1'b1;
             en_fifo2axis = 1'b1;
-            wstrb_int = {WSTRB_W{1'b1}};
+            //wstrb_int = {WSTRB_W{1'b1}};
             if (!write_busy) begin // Wait for the AXI write burst converter to finish
                 state_nxt = WAIT_DATA;
             end
         """,
         },
+        "snippets": [
+            {
+                "verilog_code": """
+    assign w_addr_protocol = start_addr_i;
+    assign w_length_protocol = length_i - 1'b1;
+    assign w_start_protocol = start_transfer;
+                """
+            }
+        ],
     }
 
     return attributes_dict

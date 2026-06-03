@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -33,14 +33,14 @@ def setup(py_params_dict):
                 "descr": "Clock, clock enable and reset",
             },
             {
-                "name": "counter_rst_i",
+                "name": "rst_i",
                 "descr": "Counter reset input",
-                "signals": [{"name": "counter_rst_i"}],
+                "signals": [{"name": "rst_i"}],
             },
             {
-                "name": "counter_en_i",
+                "name": "en_i",
                 "descr": "Counter enable input",
-                "signals": [{"name": "counter_en_i"}],
+                "signals": [{"name": "en_i"}],
             },
             {
                 "name": "data_o",
@@ -72,8 +72,8 @@ def setup(py_params_dict):
                     "clk_en_rst_s": (
                         "clk_en_rst_s",
                         [
-                            "en_i:counter_en_i",
-                            "rst_i:counter_rst_i",
+                            "en_i:en_i",
+                            "rst_i:rst_i",
                         ],
                     ),
                     "data_i": "data_int",
