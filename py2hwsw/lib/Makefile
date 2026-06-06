@@ -202,6 +202,16 @@ endif
 
 .PHONY: buildroot-update
 
+linux-kernel:
+	# Copy defconfig (linux_config) from iob_system_linux to iob_linux
+	cp iob_system/iob_system_linux/software/linux_config $(LINUX_SUBMODULE_DIR)/software/linux_config
+	# Build Linux kernel
+	nix-shell $(LINUX_SUBMODULE_DIR) --run 'make -C $(LINUX_SUBMODULE_DIR) build-linux-kernel'
+	# Copy built Linux kernel to iob_system_linux
+	cp $(LINUX_SUBMODULE_DIR)/software/OS_build/Image iob_system/iob_system_linux/software/src/Image
+
+.PHONY: linux-kernel
+
 # Find board directoy in py2hwsw/hardware/fpga
 BOARD_DIR := $(shell find ../hardware/fpga -name $(BOARD) -type d -print -quit)
 # Include board.mk to set BOARD_USER, BOARD_SERVER, and BOARD_SERIAL_PORT
