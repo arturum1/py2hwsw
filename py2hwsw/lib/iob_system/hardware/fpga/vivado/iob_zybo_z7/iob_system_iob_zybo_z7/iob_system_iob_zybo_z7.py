@@ -285,7 +285,7 @@ def setup(py_params_dict):
     assign arst = ~rst_n;
 
     // Connect iob_system uart flow control
-    assign uut_rs232_cts = 1'b1;
+    assign uut_rs232_cts = 1'b0;
     // uut_rs232_rts floating
 
     // For now, UART pins can be connected to either iob_system or PS7. Select one below.

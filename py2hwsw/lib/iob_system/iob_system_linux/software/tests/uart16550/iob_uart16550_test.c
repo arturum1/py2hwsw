@@ -145,8 +145,8 @@ int main(int argc, char *argv[]) {
   }
 
   /* Open devices in non-blocking mode to allow precise control */
-  int fd1 = open(dev1, O_RDWR | O_NOCTTY | O_NONBLOCK);
-  int fd2 = open(dev2, O_RDWR | O_NOCTTY | O_NONBLOCK);
+  int fd1 = open(dev1, O_RDWR | O_NOCTTY);
+  int fd2 = open(dev2, O_RDWR | O_NOCTTY);
 
   if (fd1 < 0 || fd2 < 0) {
     perror("Error opening UART devices");

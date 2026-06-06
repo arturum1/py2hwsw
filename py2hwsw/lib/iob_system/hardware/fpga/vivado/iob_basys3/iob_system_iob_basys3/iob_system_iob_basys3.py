@@ -100,7 +100,7 @@ def setup(py_params_dict):
                 {"name": "rxd_i"},
                 {"name": "txd_o"},
                 {"name": "rs232_rts", "width": "1"},
-                {"name": "high", "width": "1"},
+                {"name": "low", "width": "1"},
             ],
         },
         {
@@ -184,6 +184,17 @@ def setup(py_params_dict):
                 "rst_i": "arst",
                 "axi_s": "memory_axi",
             },
+        },
+    ]
+    #
+    # Snippets
+    #
+    attributes_dict["snippets"] = [
+        {
+            "verilog_code": """
+    // General connections
+    assign low = 1'b0;
+""",
         },
     ]
 
