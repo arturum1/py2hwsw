@@ -407,7 +407,6 @@ def setup(py_params_dict):
             {
                 "verilog_code": """
     // Ethernet connections
-    assign low = 1'b0;
     assign enet_resetn_inv = ~enet_resetn_o;
 
     //MII
