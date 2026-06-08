@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 IObundle
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

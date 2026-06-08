@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 IObundle
+
+SPDX-License-Identifier: MIT
+-->
+
 # IOb-UART16550 Linux Driver Compatibility Test
 
 This test suite validates the **IOb-UART16550** hardware core's compatibility with the standard Linux `8250/16550` serial driver. It uses a loopback configuration between two UART instances to verify register-level behavior, timing, and data integrity across various operation modes.
