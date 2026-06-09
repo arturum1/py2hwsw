@@ -2,7 +2,7 @@
 
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # IOb-UART16550 Automated Validation Script
 # This script runs the user-space test and verifies kernel-level counters.
