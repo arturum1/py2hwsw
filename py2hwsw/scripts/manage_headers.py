@@ -14,14 +14,17 @@ to check if the project is compliant with REUSE Specification.
 Check project compliance: `reuse lint`
 
 Download license files: `reuse download GPL-3.0-only`
-                       `reuse download CERN-OHL-V2-S`
+                       `reuse download CERN-OHL-S-2.0`
 
 By default, the spdx header of this script should match the changes made by the `reuse`
 tool with this command:
 `reuse annotate --copyright="IObundle" --license="GPL-3.0-only" -r . --skip-unrecognised`
 
 Note that this script supports more file types than the `reuse` tool.
-And this script overrides existing headers (does not keep old license headers).
+When a file already has an SPDX header, the script merges with the existing content:
+third-party copyright lines and contributor lines are preserved, and the IObundle
+copyright year is updated. The license identifier is replaced only when IObundle
+is the sole copyright holder.
 """
 
 import os
@@ -197,8 +200,8 @@ def main():
     )
     parser.add_argument(
         "--hw-license",
-        default="CERN-OHL-V2-S",
-        help="SPDX license identifier for hardware files (default: CERN-OHL-V2-S)",
+        default="CERN-OHL-S-2.0",
+        help="SPDX license identifier for hardware files (default: CERN-OHL-S-2.0)",
     )
     parser.add_argument(
         "--license-path",
@@ -240,7 +243,7 @@ def generate_headers(
     copyright_holder="IObundle",
     copyright_year=datetime.now().year,
     license_name="GPL-3.0-only",
-    hw_license_name="CERN-OHL-V2-S",
+    hw_license_name="CERN-OHL-S-2.0",
     license_path=".",
     header_template="spdx",
     custom_header_suffix="",
@@ -329,6 +332,7 @@ def generate_headers(
             comment_char=comment_char[
                 next(ext for ext in comment_char if file.endswith(ext))
             ],
+            copyright_holder=copyright_holder,
             skip_existing_headers=skip_existing_headers,
             delete_only=delete_only,
         )
@@ -343,6 +347,7 @@ def generate_headers(
                 comment_char=comment_char[
                     next(ext for ext in comment_char if file.endswith(ext))
                 ],
+                copyright_holder=copyright_holder,
                 skip_existing_headers=skip_existing_headers,
                 delete_only=delete_only,
             )
@@ -383,19 +388,23 @@ def modify_file_header(
     filepath,
     new_header,
     comment_char="#",
+    copyright_holder="IObundle",
     skip_existing_headers=False,
     delete_only=False,
 ):
     """
     Modifies the header of a file, replacing it with a new header.
+    If the file already has an SPDX header, merges with existing content
+    to preserve third-party copyright lines.
 
     :param filepath: The path to the file to modify.
     :param new_header: The new header text to insert.
     :param comment_char: The character that starts each header line (default: "#").
+    :param copyright_holder: The copyright holder name to identify "our" lines.
     """
-    global DEBUG
+    global DEBUG, VERBOSE
     try:
-        empty_file = 0
+        empty_file = False
         with open(filepath, "r") as file:
             lines = file.readlines()
             empty_file = not len(lines)
@@ -403,8 +412,8 @@ def modify_file_header(
         header_start_index = 0
         insert_blank_line = False
         is_multiline = comment_char in multiline_comments
+
         if not empty_file:
-            # Check if file has shebang line
             if lines[0].startswith("#!") or lines[0].startswith("<?xml"):
                 header_start_index = 1
                 insert_blank_line = True
@@ -412,95 +421,144 @@ def modify_file_header(
             if (
                 insert_blank_line
                 and not lines[header_start_index].strip()
+                and len(lines) > header_start_index + 1
                 and lines[header_start_index + 1].startswith(comment_char)
             ):
-                # Remove blank line before header
                 lines.pop(header_start_index)
 
-            # Check if file already has a header
-            if skip_existing_headers and lines[header_start_index].startswith(
-                comment_char
-            ):
+        has_header = not empty_file and lines[header_start_index].startswith(comment_char)
+
+        # --- Parse and remove existing header ---
+        old_raw = []
+        if has_header:
+            if skip_existing_headers:
                 if VERBOSE:
                     print(f"Header skipped in {filepath}")
                 return
 
-            # Only delete headers if they are recognized as old versions of the new header.
-            # Otherwise, they may just be comments that happen to be at the start of the file, so they should not be deleted.
-            # if update_headers_only and header_recognize( "".join(lines[header_start_index:]), new_header):
-
-            # Multi-line
-            if is_multiline and lines[header_start_index].startswith(comment_char):
+            if is_multiline:
                 body_comment_char = multiline_comments[comment_char][0]
+                body_prefix = f"{body_comment_char} " if body_comment_char else ""
+                body_prefix_blank = body_comment_char
                 end_comment_char = multiline_comments[comment_char][1]
-                # Remove multiline start
-                lines.pop(header_start_index)
-                # Remove old header body
-                while lines[header_start_index].startswith(
-                    body_comment_char
-                ) and not lines[header_start_index].startswith(end_comment_char):
-                    lines.pop(header_start_index)
-                # Remove multiline end
-                lines.pop(header_start_index)
-                # Remove blank line after header (if any)
-                if (
-                    len(lines) > header_start_index
-                    and not lines[header_start_index].strip()
-                ):
-                    lines.pop(header_start_index)
-            # Not multi-line
-            elif lines[header_start_index].startswith(comment_char):
-                # Remove old header
-                while len(lines) and lines[header_start_index].startswith(comment_char):
-                    lines.pop(header_start_index)
-                # Remove blank line after header (if any)
-                if (
-                    len(lines) > header_start_index
-                    and not lines[header_start_index].strip()
-                ):
-                    lines.pop(header_start_index)
 
-        # Create the new header lines
+                lines.pop(header_start_index)
+                while not lines[header_start_index].startswith(end_comment_char):
+                    s = lines.pop(header_start_index).rstrip("\n")
+                    if body_prefix and s.startswith(body_prefix):
+                        old_raw.append(s[len(body_prefix):])
+                    elif body_prefix_blank and s.startswith(body_prefix_blank):
+                        old_raw.append(s[len(body_prefix_blank):])
+                    else:
+                        old_raw.append(s)
+                lines.pop(header_start_index)
+            else:
+                while len(lines) > header_start_index and lines[header_start_index].startswith(comment_char):
+                    s = lines.pop(header_start_index).rstrip("\n")
+                    if s.startswith(comment_char + " "):
+                        old_raw.append(s[len(comment_char) + 1:])
+                    elif s.startswith(comment_char):
+                        old_raw.append(s[len(comment_char):])
+                    else:
+                        old_raw.append(s)
+
+            if len(lines) > header_start_index and not lines[header_start_index].strip():
+                lines.pop(header_start_index)
+
+            if delete_only:
+                new_content = lines[:header_start_index] + lines[header_start_index:]
+                if DEBUG:
+                    print("".join(new_content))
+                    return
+                with open(filepath, "w") as file:
+                    file.writelines(new_content)
+                if VERBOSE:
+                    print(f"Header deleted from {filepath}")
+                return
+
+            # --- Merge existing header with new header ---
+            new_raw = [ln.rstrip("\n") for ln in new_header.splitlines()]
+
+            our_new_copyrights = []
+            new_license_lines = []
+            for ln in new_raw:
+                stripped = ln.strip()
+                if "SPDX-FileCopyrightText:" in stripped and copyright_holder in stripped:
+                    our_new_copyrights.append(ln)
+                elif "SPDX-License-Identifier:" in stripped:
+                    new_license_lines.append(ln)
+
+            has_third_party = any(
+                "SPDX-FileCopyrightText:" in ln.strip() and copyright_holder not in ln.strip()
+                for ln in old_raw
+            )
+
+            merged_raw = []
+            inserted_our_copyright = False
+            for ln in old_raw:
+                stripped = ln.strip()
+                if "SPDX-FileCopyrightText:" in stripped and copyright_holder not in stripped:
+                    merged_raw.append(ln)
+                elif "SPDX-FileCopyrightText:" in stripped and copyright_holder in stripped:
+                    if not inserted_our_copyright:
+                        merged_raw.extend(our_new_copyrights)
+                        inserted_our_copyright = True
+                elif "SPDX-FileContributor:" in stripped:
+                    merged_raw.append(ln)
+                elif "SPDX-License-Identifier:" in stripped:
+                    if has_third_party:
+                        merged_raw.append(ln)
+                    else:
+                        merged_raw.extend(new_license_lines)
+                else:
+                    merged_raw.append(ln)
+
+            if not inserted_our_copyright:
+                merged_raw.extend(our_new_copyrights)
+
+            source_lines = merged_raw
+        else:
+            if delete_only:
+                return
+            source_lines = [ln.rstrip("\n") for ln in new_header.splitlines()]
+
+        # --- Build new header lines ---
         new_header_lines = []
 
         if insert_blank_line and not delete_only:
             new_header_lines.append("\n")
 
-        # Multi-line
-        if is_multiline and not delete_only:
+        if not delete_only and is_multiline:
             body_comment_char = multiline_comments[comment_char][0]
-            body_comment_char = f"{body_comment_char} " if body_comment_char else ""
+            body_line_prefix = f"{body_comment_char} " if body_comment_char else ""
             end_comment_char = multiline_comments[comment_char][1]
             new_header_lines.append(f"{comment_char}\n")
-            for line in new_header.splitlines():
-                body_line_prefix = body_comment_char
+            for line in source_lines:
                 if not line.strip():
-                    body_line_prefix = body_comment_char[:-1]
-                new_header_lines.append(f"{body_line_prefix}{line}\n")
+                    new_header_lines.append(f"{body_comment_char}\n")
+                else:
+                    new_header_lines.append(f"{body_line_prefix}{line}\n")
             new_header_lines.append(f"{end_comment_char}\n")
             new_header_lines.append("\n")
-        # Not multi-line
         elif not delete_only:
-            for line in new_header.splitlines():
+            for line in source_lines:
                 if line.strip():
                     new_header_lines.append(f"{comment_char} {line}\n")
                 else:
                     new_header_lines.append(f"{comment_char}\n")
             new_header_lines.append("\n")
 
-        # Prepare the new content
         if empty_file:
-            new_content = new_header_lines  # New header lines
+            new_content = new_header_lines
         else:
-            new_content = lines[:header_start_index]  # Lines before the header
-            new_content += new_header_lines  # New header lines
-            new_content += lines[header_start_index:]  # Lines after the old header
+            new_content = lines[:header_start_index]
+            new_content += new_header_lines
+            new_content += lines[header_start_index:]
 
         if DEBUG:
             print("".join(new_content))
             return
 
-        # Write the new content back to the file
         with open(filepath, "w") as file:
             file.writelines(new_content)
 

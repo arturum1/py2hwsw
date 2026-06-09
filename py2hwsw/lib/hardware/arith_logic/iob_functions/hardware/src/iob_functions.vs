@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 IObundle
 //
-// SPDX-License-Identifier: CERN-OHL-V2-S
+// SPDX-License-Identifier: CERN-OHL-S-2.0
 
 function [31:0] iob_max;
    input [31:0] a;
