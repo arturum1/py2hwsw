@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: 2023 Advanced Micro Devices, Inc.
  * SPDX-FileCopyrightText: 2026 IObundle
  *
- * SPDX-License-Identifier: GPL-3.0-only
+ * SPDX-License-Identifier: MIT
  */
 
 _STACK_SIZE = DEFINED(_STACK_SIZE) ? _STACK_SIZE : 0x2000;
