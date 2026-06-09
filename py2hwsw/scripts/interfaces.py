@@ -2,7 +2,7 @@
 
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # This script generates interfaces for Verilog modules and testbenches to add a
 # new standard interface, add the name to the interface_names list, and an

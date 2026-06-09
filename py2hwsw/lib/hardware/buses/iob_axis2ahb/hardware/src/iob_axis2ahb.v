@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 IObundle
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: CERN-OHL-V2-S
 
 // Language: Verilog 2001
 `timescale 1ns / 1ps

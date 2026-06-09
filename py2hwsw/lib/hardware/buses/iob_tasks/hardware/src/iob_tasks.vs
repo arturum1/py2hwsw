@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 IObundle
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: CERN-OHL-V2-S
 
 //
 // Tasks for the IOb Native protocol

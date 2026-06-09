@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 LINUX_DIR := ../../../submodules/OS/submodules/linux-5.15.98
 PWD:=$(shell pwd)

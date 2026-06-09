@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 VITIS_VERSION = 2024.2
 VITIS_SETTINGS = /opt/Xilinx/Vitis/$(VITIS_VERSION)/settings64.sh

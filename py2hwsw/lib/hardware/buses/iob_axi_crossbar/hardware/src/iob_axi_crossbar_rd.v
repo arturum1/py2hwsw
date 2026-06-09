@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2018 Alex Forencich
-// SPDX-FileCopyrightText: 2025 IObundle
+// SPDX-FileCopyrightText: 2026 IObundle
 //
 // SPDX-License-Identifier: MIT
 
@@ -210,47 +210,47 @@ module iob_axi_crossbar_rd #(
             .M_SECURE    (M_SECURE),
             .WC_OUTPUT   (0)
          ) addr_inst (
-            .clk(clk),
-            .rst(rst),
+             .clk(clk),
+             .rst(rst),
 
-            /*
+             /*
              * Address input
              */
-            .s_axi_aid   (int_s_axi_arid[m*S_ID_WIDTH+:S_ID_WIDTH]),
-            .s_axi_aaddr (int_s_axi_araddr[m*ADDR_WIDTH+:ADDR_WIDTH]),
-            .s_axi_aprot (int_s_axi_arprot[m*3+:3]),
-            .s_axi_aqos  (int_s_axi_arqos[m*4+:4]),
-            .s_axi_avalid(int_s_axi_arvalid[m]),
-            .s_axi_aready(int_s_axi_arready[m]),
+             .s_axi_aid   (int_s_axi_arid[m*S_ID_WIDTH+:S_ID_WIDTH]),
+             .s_axi_aaddr (int_s_axi_araddr[m*ADDR_WIDTH+:ADDR_WIDTH]),
+             .s_axi_aprot (int_s_axi_arprot[m*3+:3]),
+             .s_axi_aqos  (int_s_axi_arqos[m*4+:4]),
+             .s_axi_avalid(int_s_axi_arvalid[m]),
+             .s_axi_aready(int_s_axi_arready[m]),
 
-            /*
+             /*
              * Address output
              */
-            .m_axi_aregion(int_s_axi_arregion[m*4+:4]),
-            .m_select     (a_select),
-            .m_axi_avalid (m_axi_avalid),
-            .m_axi_aready (m_axi_aready),
+             .m_axi_aregion(int_s_axi_arregion[m*4+:4]),
+             .m_select     (a_select),
+             .m_axi_avalid (m_axi_avalid),
+             .m_axi_aready (m_axi_aready),
 
-            /*
+             /*
              * Write command output
              */
-            .m_wc_select(),
-            .m_wc_decerr(),
-            .m_wc_valid (),
-            .m_wc_ready (1'b1),
+             .m_wc_select(),
+             .m_wc_decerr(),
+             .m_wc_valid (),
+             .m_wc_ready (1'b1),
 
-            /*
+             /*
              * Response command output
              */
-            .m_rc_decerr(m_rc_decerr),
-            .m_rc_valid (m_rc_valid),
-            .m_rc_ready (m_rc_ready),
+             .m_rc_decerr(m_rc_decerr),
+             .m_rc_valid (m_rc_valid),
+             .m_rc_ready (m_rc_ready),
 
-            /*
+             /*
              * Completion input
              */
-            .s_cpl_id   (s_cpl_id),
-            .s_cpl_valid(s_cpl_valid)
+             .s_cpl_id   (s_cpl_id),
+             .s_cpl_valid(s_cpl_valid)
          );
 
          assign int_axi_arvalid[m*M_COUNT+:M_COUNT] = m_axi_avalid << a_select;
@@ -315,14 +315,14 @@ module iob_axi_crossbar_rd #(
             .BLOCK       ("ACKNOWLEDGE"),
             .LSB_PRIORITY("HIGH")
          ) r_arb_inst (
-            .clk          (clk),
-            .arst         (1'b0),
-            .rst          (rst),
-            .request      (r_request),
-            .acknowledge  (r_acknowledge),
-            .grant        (r_grant),
-            .grant_valid  (r_grant_valid),
-            .grant_encoded(r_grant_encoded)
+             .clk          (clk),
+             .arst         (1'b0),
+             .rst          (rst),
+             .request      (r_request),
+             .acknowledge  (r_acknowledge),
+             .grant        (r_grant),
+             .grant_valid  (r_grant_valid),
+             .grant_encoded(r_grant_encoded)
          );
 
          // read response mux
@@ -367,48 +367,48 @@ module iob_axi_crossbar_rd #(
             .AR_REG_TYPE  (S_AR_REG_TYPE[m*2+:2]),
             .R_REG_TYPE   (S_R_REG_TYPE[m*2+:2])
          ) reg_inst (
-            .clk           (clk),
-            .rst           (rst),
-            .s_axi_arid    (s_axi_arid[m*S_ID_WIDTH+:S_ID_WIDTH]),
-            .s_axi_araddr  (s_axi_araddr[m*ADDR_WIDTH+:ADDR_WIDTH]),
-            .s_axi_arlen   (s_axi_arlen[m*8+:8]),
-            .s_axi_arsize  (s_axi_arsize[m*3+:3]),
-            .s_axi_arburst (s_axi_arburst[m*2+:2]),
-            .s_axi_arlock  (s_axi_arlock[m]),
-            .s_axi_arcache (s_axi_arcache[m*4+:4]),
-            .s_axi_arprot  (s_axi_arprot[m*3+:3]),
-            .s_axi_arqos   (s_axi_arqos[m*4+:4]),
-            .s_axi_arregion(4'd0),
-            .s_axi_aruser  (s_axi_aruser[m*ARUSER_WIDTH+:ARUSER_WIDTH]),
-            .s_axi_arvalid (s_axi_arvalid[m]),
-            .s_axi_arready (s_axi_arready[m]),
-            .s_axi_rid     (s_axi_rid[m*S_ID_WIDTH+:S_ID_WIDTH]),
-            .s_axi_rdata   (s_axi_rdata[m*DATA_WIDTH+:DATA_WIDTH]),
-            .s_axi_rresp   (s_axi_rresp[m*2+:2]),
-            .s_axi_rlast   (s_axi_rlast[m]),
-            .s_axi_ruser   (s_axi_ruser[m*RUSER_WIDTH+:RUSER_WIDTH]),
-            .s_axi_rvalid  (s_axi_rvalid[m]),
-            .s_axi_rready  (s_axi_rready[m]),
-            .m_axi_arid    (int_s_axi_arid[m*S_ID_WIDTH+:S_ID_WIDTH]),
-            .m_axi_araddr  (int_s_axi_araddr[m*ADDR_WIDTH+:ADDR_WIDTH]),
-            .m_axi_arlen   (int_s_axi_arlen[m*8+:8]),
-            .m_axi_arsize  (int_s_axi_arsize[m*3+:3]),
-            .m_axi_arburst (int_s_axi_arburst[m*2+:2]),
-            .m_axi_arlock  (int_s_axi_arlock[m]),
-            .m_axi_arcache (int_s_axi_arcache[m*4+:4]),
-            .m_axi_arprot  (int_s_axi_arprot[m*3+:3]),
-            .m_axi_arqos   (int_s_axi_arqos[m*4+:4]),
-            .m_axi_arregion(),
-            .m_axi_aruser  (int_s_axi_aruser[m*ARUSER_WIDTH+:ARUSER_WIDTH]),
-            .m_axi_arvalid (int_s_axi_arvalid[m]),
-            .m_axi_arready (int_s_axi_arready[m]),
-            .m_axi_rid     (m_axi_rid_mux),
-            .m_axi_rdata   (m_axi_rdata_mux),
-            .m_axi_rresp   (m_axi_rresp_mux),
-            .m_axi_rlast   (m_axi_rlast_mux),
-            .m_axi_ruser   (m_axi_ruser_mux),
-            .m_axi_rvalid  (m_axi_rvalid_mux),
-            .m_axi_rready  (m_axi_rready_mux)
+             .clk           (clk),
+             .rst           (rst),
+             .s_axi_arid    (s_axi_arid[m*S_ID_WIDTH+:S_ID_WIDTH]),
+             .s_axi_araddr  (s_axi_araddr[m*ADDR_WIDTH+:ADDR_WIDTH]),
+             .s_axi_arlen   (s_axi_arlen[m*8+:8]),
+             .s_axi_arsize  (s_axi_arsize[m*3+:3]),
+             .s_axi_arburst (s_axi_arburst[m*2+:2]),
+             .s_axi_arlock  (s_axi_arlock[m]),
+             .s_axi_arcache (s_axi_arcache[m*4+:4]),
+             .s_axi_arprot  (s_axi_arprot[m*3+:3]),
+             .s_axi_arqos   (s_axi_arqos[m*4+:4]),
+             .s_axi_arregion(4'd0),
+             .s_axi_aruser  (s_axi_aruser[m*ARUSER_WIDTH+:ARUSER_WIDTH]),
+             .s_axi_arvalid (s_axi_arvalid[m]),
+             .s_axi_arready (s_axi_arready[m]),
+             .s_axi_rid     (s_axi_rid[m*S_ID_WIDTH+:S_ID_WIDTH]),
+             .s_axi_rdata   (s_axi_rdata[m*DATA_WIDTH+:DATA_WIDTH]),
+             .s_axi_rresp   (s_axi_rresp[m*2+:2]),
+             .s_axi_rlast   (s_axi_rlast[m]),
+             .s_axi_ruser   (s_axi_ruser[m*RUSER_WIDTH+:RUSER_WIDTH]),
+             .s_axi_rvalid  (s_axi_rvalid[m]),
+             .s_axi_rready  (s_axi_rready[m]),
+             .m_axi_arid    (int_s_axi_arid[m*S_ID_WIDTH+:S_ID_WIDTH]),
+             .m_axi_araddr  (int_s_axi_araddr[m*ADDR_WIDTH+:ADDR_WIDTH]),
+             .m_axi_arlen   (int_s_axi_arlen[m*8+:8]),
+             .m_axi_arsize  (int_s_axi_arsize[m*3+:3]),
+             .m_axi_arburst (int_s_axi_arburst[m*2+:2]),
+             .m_axi_arlock  (int_s_axi_arlock[m]),
+             .m_axi_arcache (int_s_axi_arcache[m*4+:4]),
+             .m_axi_arprot  (int_s_axi_arprot[m*3+:3]),
+             .m_axi_arqos   (int_s_axi_arqos[m*4+:4]),
+             .m_axi_arregion(),
+             .m_axi_aruser  (int_s_axi_aruser[m*ARUSER_WIDTH+:ARUSER_WIDTH]),
+             .m_axi_arvalid (int_s_axi_arvalid[m]),
+             .m_axi_arready (int_s_axi_arready[m]),
+             .m_axi_rid     (m_axi_rid_mux),
+             .m_axi_rdata   (m_axi_rdata_mux),
+             .m_axi_rresp   (m_axi_rresp_mux),
+             .m_axi_rlast   (m_axi_rlast_mux),
+             .m_axi_ruser   (m_axi_ruser_mux),
+             .m_axi_rvalid  (m_axi_rvalid_mux),
+             .m_axi_rready  (m_axi_rready_mux)
          );
       end  // s_ifaces
 
@@ -446,14 +446,14 @@ module iob_axi_crossbar_rd #(
             .BLOCK       ("ACKNOWLEDGE"),
             .LSB_PRIORITY("HIGH")
          ) a_arb_inst (
-            .clk          (clk),
-            .arst         (1'b0),
-            .rst          (rst),
-            .request      (a_request),
-            .acknowledge  (a_acknowledge),
-            .grant        (a_grant),
-            .grant_valid  (a_grant_valid),
-            .grant_encoded(a_grant_encoded)
+             .clk          (clk),
+             .arst         (1'b0),
+             .rst          (rst),
+             .request      (a_request),
+             .acknowledge  (a_acknowledge),
+             .grant        (a_grant),
+             .grant_valid  (a_grant_valid),
+             .grant_encoded(a_grant_encoded)
          );
 
          // address mux
@@ -515,48 +515,48 @@ module iob_axi_crossbar_rd #(
             .AR_REG_TYPE  (M_AR_REG_TYPE[n*2+:2]),
             .R_REG_TYPE   (M_R_REG_TYPE[n*2+:2])
          ) reg_inst (
-            .clk           (clk),
-            .rst           (rst),
-            .s_axi_arid    (s_axi_arid_mux),
-            .s_axi_araddr  (s_axi_araddr_mux),
-            .s_axi_arlen   (s_axi_arlen_mux),
-            .s_axi_arsize  (s_axi_arsize_mux),
-            .s_axi_arburst (s_axi_arburst_mux),
-            .s_axi_arlock  (s_axi_arlock_mux),
-            .s_axi_arcache (s_axi_arcache_mux),
-            .s_axi_arprot  (s_axi_arprot_mux),
-            .s_axi_arqos   (s_axi_arqos_mux),
-            .s_axi_arregion(s_axi_arregion_mux),
-            .s_axi_aruser  (s_axi_aruser_mux),
-            .s_axi_arvalid (s_axi_arvalid_mux),
-            .s_axi_arready (s_axi_arready_mux),
-            .s_axi_rid     (int_m_axi_rid[n*M_ID_WIDTH+:M_ID_WIDTH]),
-            .s_axi_rdata   (int_m_axi_rdata[n*DATA_WIDTH+:DATA_WIDTH]),
-            .s_axi_rresp   (int_m_axi_rresp[n*2+:2]),
-            .s_axi_rlast   (int_m_axi_rlast[n]),
-            .s_axi_ruser   (int_m_axi_ruser[n*RUSER_WIDTH+:RUSER_WIDTH]),
-            .s_axi_rvalid  (int_m_axi_rvalid[n]),
-            .s_axi_rready  (int_m_axi_rready[n]),
-            .m_axi_arid    (m_axi_arid[n*M_ID_WIDTH+:M_ID_WIDTH]),
-            .m_axi_araddr  (m_axi_araddr[n*ADDR_WIDTH+:ADDR_WIDTH]),
-            .m_axi_arlen   (m_axi_arlen[n*8+:8]),
-            .m_axi_arsize  (m_axi_arsize[n*3+:3]),
-            .m_axi_arburst (m_axi_arburst[n*2+:2]),
-            .m_axi_arlock  (m_axi_arlock[n]),
-            .m_axi_arcache (m_axi_arcache[n*4+:4]),
-            .m_axi_arprot  (m_axi_arprot[n*3+:3]),
-            .m_axi_arqos   (m_axi_arqos[n*4+:4]),
-            .m_axi_arregion(m_axi_arregion[n*4+:4]),
-            .m_axi_aruser  (m_axi_aruser[n*ARUSER_WIDTH+:ARUSER_WIDTH]),
-            .m_axi_arvalid (m_axi_arvalid[n]),
-            .m_axi_arready (m_axi_arready[n]),
-            .m_axi_rid     (m_axi_rid[n*M_ID_WIDTH+:M_ID_WIDTH]),
-            .m_axi_rdata   (m_axi_rdata[n*DATA_WIDTH+:DATA_WIDTH]),
-            .m_axi_rresp   (m_axi_rresp[n*2+:2]),
-            .m_axi_rlast   (m_axi_rlast[n]),
-            .m_axi_ruser   (m_axi_ruser[n*RUSER_WIDTH+:RUSER_WIDTH]),
-            .m_axi_rvalid  (m_axi_rvalid[n]),
-            .m_axi_rready  (m_axi_rready[n])
+             .clk           (clk),
+             .rst           (rst),
+             .s_axi_arid    (s_axi_arid_mux),
+             .s_axi_araddr  (s_axi_araddr_mux),
+             .s_axi_arlen   (s_axi_arlen_mux),
+             .s_axi_arsize  (s_axi_arsize_mux),
+             .s_axi_arburst (s_axi_arburst_mux),
+             .s_axi_arlock  (s_axi_arlock_mux),
+             .s_axi_arcache (s_axi_arcache_mux),
+             .s_axi_arprot  (s_axi_arprot_mux),
+             .s_axi_arqos   (s_axi_arqos_mux),
+             .s_axi_arregion(s_axi_arregion_mux),
+             .s_axi_aruser  (s_axi_aruser_mux),
+             .s_axi_arvalid (s_axi_arvalid_mux),
+             .s_axi_arready (s_axi_arready_mux),
+             .s_axi_rid     (int_m_axi_rid[n*M_ID_WIDTH+:M_ID_WIDTH]),
+             .s_axi_rdata   (int_m_axi_rdata[n*DATA_WIDTH+:DATA_WIDTH]),
+             .s_axi_rresp   (int_m_axi_rresp[n*2+:2]),
+             .s_axi_rlast   (int_m_axi_rlast[n]),
+             .s_axi_ruser   (int_m_axi_ruser[n*RUSER_WIDTH+:RUSER_WIDTH]),
+             .s_axi_rvalid  (int_m_axi_rvalid[n]),
+             .s_axi_rready  (int_m_axi_rready[n]),
+             .m_axi_arid    (m_axi_arid[n*M_ID_WIDTH+:M_ID_WIDTH]),
+             .m_axi_araddr  (m_axi_araddr[n*ADDR_WIDTH+:ADDR_WIDTH]),
+             .m_axi_arlen   (m_axi_arlen[n*8+:8]),
+             .m_axi_arsize  (m_axi_arsize[n*3+:3]),
+             .m_axi_arburst (m_axi_arburst[n*2+:2]),
+             .m_axi_arlock  (m_axi_arlock[n]),
+             .m_axi_arcache (m_axi_arcache[n*4+:4]),
+             .m_axi_arprot  (m_axi_arprot[n*3+:3]),
+             .m_axi_arqos   (m_axi_arqos[n*4+:4]),
+             .m_axi_arregion(m_axi_arregion[n*4+:4]),
+             .m_axi_aruser  (m_axi_aruser[n*ARUSER_WIDTH+:ARUSER_WIDTH]),
+             .m_axi_arvalid (m_axi_arvalid[n]),
+             .m_axi_arready (m_axi_arready[n]),
+             .m_axi_rid     (m_axi_rid[n*M_ID_WIDTH+:M_ID_WIDTH]),
+             .m_axi_rdata   (m_axi_rdata[n*DATA_WIDTH+:DATA_WIDTH]),
+             .m_axi_rresp   (m_axi_rresp[n*2+:2]),
+             .m_axi_rlast   (m_axi_rlast[n]),
+             .m_axi_ruser   (m_axi_ruser[n*RUSER_WIDTH+:RUSER_WIDTH]),
+             .m_axi_rvalid  (m_axi_rvalid[n]),
+             .m_axi_rready  (m_axi_rready[n])
          );
       end  // m_ifaces
 

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 SIM_SERVER=$(SYNOPSYS_SERVER)
 SIM_USER=$(SYNOPSYS_USER)

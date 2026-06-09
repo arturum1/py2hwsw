@@ -2,7 +2,7 @@
 
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 """
 Script to manage file headers (including SPDX license headers).
@@ -13,11 +13,12 @@ After running this script with the 'spdx' header template, you can use the `reus
 to check if the project is compliant with REUSE Specification.
 Check project compliance: `reuse lint`
 
-Download MIT license file: `reuse download MIT`
+Download license files: `reuse download GPL-3.0-only`
+                       `reuse download CERN-OHL-V2-S`
 
 By default, the spdx header of this script should match the changes made by the `reuse`
 tool with this command:
-`reuse annotate --copyright="IObundle" --license="MIT" -r . --skip-unrecognised`
+`reuse annotate --copyright="IObundle" --license="GPL-3.0-only" -r . --skip-unrecognised`
 
 Note that this script supports more file types than the `reuse` tool.
 And this script overrides existing headers (does not keep old license headers).
@@ -47,6 +48,7 @@ comment_char = {
     ".nix": "#",
     ".tex": "%",
     ".cls": "%",
+    ".sty": "%",
     ".yml": "#",
     ".gitignore": "#",
     ".gitmodules": "#",
@@ -66,6 +68,10 @@ comment_char = {
     "Doxyfile": "#",
     ".xml": "<!--",
     ".rsp": "#",
+    ".vlt": "//",
+    ".sv": "/*",
+    ".ld": "/*",
+    ".S": "#",
 }
 
 # File extensions with independent license headers
@@ -89,6 +95,7 @@ independent_lic_extensions = [
     ".gz",
     ".ko",
     ".conf",
+    ".pub",
 ]
 
 # Strings used in multiline comments
@@ -97,6 +104,9 @@ multiline_comments = {
     "/*": (" *", " */"),
     "<!--": ("", "-->"),
 }
+
+# Hardware description language file extensions that get a different license
+HW_EXTENSIONS = [".v", ".vh", ".vs", ".vhdl"]
 
 # Jinja2 templates for headers
 headers = {
@@ -182,8 +192,13 @@ def main():
     # SPDX header template arguments
     parser.add_argument(
         "--license",
-        default="MIT",
-        help="SPDX license identifier (default: MIT)",
+        default="GPL-3.0-only",
+        help="SPDX license identifier (default: GPL-3.0-only)",
+    )
+    parser.add_argument(
+        "--hw-license",
+        default="CERN-OHL-V2-S",
+        help="SPDX license identifier for hardware files (default: CERN-OHL-V2-S)",
     )
     parser.add_argument(
         "--license-path",
@@ -208,6 +223,7 @@ def main():
         ignore_paths=args.ignore_paths,
         copyright_holder=args.copyright_holder,
         license_name=args.license,
+        hw_license_name=args.hw_license,
         license_path=args.license_path,
         header_template=args.header,
         list_files_only=args.list_files_only,
@@ -223,7 +239,8 @@ def generate_headers(
     ignore_paths=[],
     copyright_holder="IObundle",
     copyright_year=datetime.now().year,
-    license_name="MIT",
+    license_name="GPL-3.0-only",
+    hw_license_name="CERN-OHL-V2-S",
     license_path=".",
     header_template="spdx",
     custom_header_suffix="",
@@ -279,22 +296,33 @@ def generate_headers(
     if license_name.lower() == "commercial":
         header_template = "commercial"
 
-    template_context = {
-        "copyright_lines": [
-            f"SPDX-FileCopyrightText: {copyright_year} {copyright_holder}",
-        ],
-        "contributor_lines": [],
-        "spdx_expressions": [license_name],
-        "custom_header_suffix": custom_header_suffix,
-        "copyright_holder": copyright_holder,
-        "copyright_year": copyright_year,
-        # Note: spdx_prefix is only needed because otherwise the `reuse` tool has a bug that would miss identify the template line as legitimate SPDX header for this file.
-        "spdx_prefix": "SPDX",
-    }
+    def render_header(license_expr):
+        ctx = {
+            "copyright_lines": [
+                f"SPDX-FileCopyrightText: {copyright_year} {copyright_holder}",
+            ],
+            "contributor_lines": [],
+            "spdx_expressions": [license_expr],
+            "custom_header_suffix": custom_header_suffix,
+            "copyright_holder": copyright_holder,
+            "copyright_year": copyright_year,
+            "spdx_prefix": "SPDX",
+        }
+        return render_jinja_template(headers[header_template], ctx)
 
-    header = render_jinja_template(headers[header_template], template_context)
-
+    # Separate hardware files from the rest
+    hw_files = []
+    other_files = []
     for file in files:
+        ext = next(e for e in comment_char if file.endswith(e))
+        if ext in HW_EXTENSIONS:
+            hw_files.append(file)
+        else:
+            other_files.append(file)
+
+    # Apply default license header to non-hardware files
+    header = render_header(license_name)
+    for file in other_files:
         modify_file_header(
             file,
             header,
@@ -305,8 +333,22 @@ def generate_headers(
             delete_only=delete_only,
         )
 
-    # Files with corresponding independent license files
-    files = find_files_with_extensions(
+    # Apply hardware license header to hardware files
+    if hw_files:
+        hw_header = render_header(hw_license_name)
+        for file in hw_files:
+            modify_file_header(
+                file,
+                hw_header,
+                comment_char=comment_char[
+                    next(ext for ext in comment_char if file.endswith(ext))
+                ],
+                skip_existing_headers=skip_existing_headers,
+                delete_only=delete_only,
+            )
+
+    # Files with corresponding independent license files (use default license)
+    indep_files = find_files_with_extensions(
         root,
         independent_lic_extensions,
         ignore_extensions=comment_char.keys(),
@@ -315,21 +357,20 @@ def generate_headers(
         include_files_without_extension=True,
     )
 
-    for file in files:
+    for file in indep_files:
         write_independent_lic_file(file, header)
 
-    license_src = os.path.join(license_path, f"{license_name}.txt")
-    license_dir = os.path.join(root, "LICENSES")
-    license_dst = os.path.join(license_dir, f"{license_name}.txt")
-    if not os.path.isfile(license_dst):
-        # try to copy LICENSE from license path
-        if os.path.isfile(license_src):
-            os.makedirs(license_dir, exist_ok=True)
-            shutil.copy(license_src, license_dst)
-        else:
-            # fallback if LICENSE file not found:
-            # download license using `reuse` tool
-            os.system(f"reuse --root {root} download {license_name}")
+    # Download/copy both license files
+    for lic in [license_name, hw_license_name]:
+        license_src = os.path.join(license_path, f"{lic}.txt")
+        license_dir = os.path.join(root, "LICENSES")
+        license_dst = os.path.join(license_dir, f"{lic}.txt")
+        if not os.path.isfile(license_dst):
+            if os.path.isfile(license_src):
+                os.makedirs(license_dir, exist_ok=True)
+                shutil.copy(license_src, license_dst)
+            else:
+                os.system(f"reuse --root {root} download {lic}")
 
 
 def write_independent_lic_file(file, header):

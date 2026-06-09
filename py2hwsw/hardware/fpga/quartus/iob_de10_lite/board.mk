@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 BOARD_SERVER=$(DE10_SERVER)
 BOARD_USER=$(DE10_USER)

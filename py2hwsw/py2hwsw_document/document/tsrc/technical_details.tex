@@ -1,6 +1,6 @@
 % SPDX-FileCopyrightText: 2026 IObundle
 %
-% SPDX-License-Identifier: MIT
+% SPDX-License-Identifier: GPL-3.0-only
 
 
 From the user's perspective, interacting with Py2HWSW is straightforward and intuitive. Users describe cores using dictionaries, lists, and strings, which are then converted internally into object representations of the correct class. The main attributes of Py2HWSW, such as ports, wires, and configuration, each have their own class, organizing the properties of each attribute. These attributes are described by a dictionary, where each key is a property, and are converted to the corresponding property of the class for the internal object representation when calling the Py2HWSW process.

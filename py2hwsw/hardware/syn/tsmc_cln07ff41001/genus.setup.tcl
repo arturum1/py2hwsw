@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 #get from command line arg
 set LIBDIR /tria/apps/libs/arm/tsmc/cln07ff41001

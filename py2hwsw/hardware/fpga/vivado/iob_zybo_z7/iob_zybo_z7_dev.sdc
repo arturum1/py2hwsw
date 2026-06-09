@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Constraints taken from: https://github.com/Digilent/digilent-xdc/blob/master/Zybo-Z7-Master.xdc
 # This file is a general .xdc for the Zybo Z7 Rev. B

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 IObundle
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: CERN-OHL-V2-S
 
 `timescale 1ns / 1ps
 `include "iob_timer_csrs_conf.vh"

@@ -43,3 +43,6 @@
 ./py2hwsw/lib/iob_system/iob_system_linux/software/opensbi_platform/iob_system_linux/platform.c
 ./py2hwsw/lib/iob_system/iob_system_linux/software/opensbi_platform/iob_system_linux/Kconfig
 ./py2hwsw/lib/iob_system/iob_system_linux/software/opensbi_platform/iob_system_linux/configs/defconfig
+# zynq
+./py2hwsw/software/src/zynq_ps.ld
+./py2hwsw/software/zynq_ps/lscript.ld

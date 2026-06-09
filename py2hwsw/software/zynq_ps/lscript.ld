@@ -1,7 +1,9 @@
-/******************************************************************************
-* Copyright (C) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
-* SPDX-License-Identifier: MIT
-******************************************************************************/
+/*
+ * SPDX-FileCopyrightText: 2023 Advanced Micro Devices, Inc.
+ * SPDX-FileCopyrightText: 2026 IObundle
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
 
 _STACK_SIZE = DEFINED(_STACK_SIZE) ? _STACK_SIZE : 0x2000;
 _HEAP_SIZE = DEFINED(_HEAP_SIZE) ? _HEAP_SIZE : 0x2000;
