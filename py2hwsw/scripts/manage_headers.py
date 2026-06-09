@@ -264,7 +264,10 @@ def generate_headers(
     if not ignore_paths:
         ignore_paths = []
 
-    ignore_paths += ["./LICENSES", "./.git"]
+    ignore_paths += [
+        os.path.normpath(os.path.join(root, "LICENSES")),
+        os.path.normpath(os.path.join(root, ".git")),
+    ]
 
     ignore_files = []
     # Read FILE_WITH_IGNORE_INFO if it exists
@@ -278,9 +281,10 @@ def generate_headers(
             ]
 
     # Check if there are any directories in ignore_files
-    for file in ignore_files:
-        if os.path.isdir(file):
-            ignore_paths.append(file)
+    for file in list(ignore_files):
+        normal = os.path.normpath(file)
+        if os.path.isdir(normal):
+            ignore_paths.append(os.path.normpath(os.path.join(root, normal)))
             ignore_files.remove(file)
 
     # Files that have SPDX license in header
@@ -593,8 +597,9 @@ def find_files_with_extensions(
 
     # Walk through the directory
     for root, dirs, files in os.walk(directory):
+        normal_root = os.path.normpath(root)
         # Ignore specified paths
-        if root in ignore_paths:
+        if normal_root in ignore_paths:
             dirs[:] = []
             if VERBOSE:
                 print(f"Ignoring path {root}")
