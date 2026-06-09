@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # IOb_System_Linux specific makefile segment (level 1 child - child of iob_system)
 

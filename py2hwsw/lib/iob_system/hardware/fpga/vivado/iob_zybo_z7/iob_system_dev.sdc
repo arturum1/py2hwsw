@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Constraints for Zybo Z7 board
 # Based on: https://github.com/Digilent/digilent-xdc/blob/master/Zybo-Z7-Master.xdc

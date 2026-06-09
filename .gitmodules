@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 [submodule "py2hwsw/lib/hardware/iob_system/submodules/VEXRISCV"]
 	path = py2hwsw/lib/iob_system/submodules/iob_vexriscv

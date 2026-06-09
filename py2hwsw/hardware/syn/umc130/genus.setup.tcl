@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 #get from command line arg
 set LIBDIR /opt/ic_tools/pdk/faraday/umc130

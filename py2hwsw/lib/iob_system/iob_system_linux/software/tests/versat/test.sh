@@ -2,7 +2,7 @@
 
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 
 KEY="0123456789012345678901234567890123456789012345678901234567890123"

@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: 2026 IObundle
 
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: GPL-3.0-only
 -->
 
 # Tutorial: Add New Device Driver
@@ -199,9 +199,9 @@ Include the device node in the Linux Device Tree.
 The `compatible` string must match with the `compatible` field in the driver source.
 
 ```
-// SPDX-FileCopyrightText: 2025 IObundle
+// SPDX-FileCopyrightText: 2026 IObundle
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 
 /dts-v1/;
 

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 from setuptools import setup
 from py2hwsw.scripts.py2hwsw_version import PY2HWSW_VERSION

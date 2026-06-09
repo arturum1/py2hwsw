@@ -1,7 +1,7 @@
 /*
  * SPDX-FileCopyrightText: 2026 IObundle
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 #ifndef PQCLEAN_MCELIECE348864_CLEAN_AES256CTR_H

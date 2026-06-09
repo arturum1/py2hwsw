@@ -2,7 +2,7 @@
 
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Python3 script to parse directories to search and create lists of files for each combination of the directories
 # Example directory combinations:
