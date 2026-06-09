@@ -10,11 +10,14 @@
 UART1="/dev/ttyS1"
 UART2="/dev/ttyS2"
 
+# Get the directory of the current script
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
 echo "=== IOb-UART16550 Automated Validation ==="
 
 # 1. Run the user-space test suite
 echo "Running Loopback Test Matrix..."
-./iob_uart16550_test $UART1 $UART2
+$script_dir/iob_uart16550_test $UART1 $UART2
 TEST_RESULT=$?
 
 if [ $TEST_RESULT -ne 0 ]; then
@@ -26,12 +29,12 @@ fi
 # 2. Check Kernel Error Counters
 echo ""
 echo "Checking Kernel Driver Statistics (/proc/tty/driver/serial):"
-# Extract info for the two UARTs
-STATS=$(cat /proc/tty/driver/serial | grep -E "1:|2:")
+# Extract info for the two test UARTs (identify by MMIO address, not line number)
+STATS=$(cat /proc/tty/driver/serial | grep -E "^1:|^2:")
 echo "$STATS"
 
 # Check for framing (fe), parity (pe), or overrun (oe) errors
-ERRORS=$(echo "$STATS" | grep -v "fe:0" | grep -v "pe:0" | grep -v "oe:0")
+ERRORS=$(echo "$STATS" | grep -E "(fe|pe|oe):[1-9]")
 
 if [ -n "$ERRORS" ]; then
     echo "WARNING: Kernel reported hardware errors (FE/PE/OE)!"
