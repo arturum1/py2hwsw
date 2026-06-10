@@ -315,7 +315,7 @@ def setup(py_params_dict):
         "comb": {
             "code": """
             rs232_txd_o = tx_pattern[0];
-            txen = tx_en_i & cts_int;
+            txen = tx_en_i & ~cts_int;
      //TX
       tx_pc_nxt = tx_pc + 2'd1;  //increment pc by default
       tx_pc_rst = rst_soft_i;
@@ -390,6 +390,7 @@ def setup(py_params_dict):
 
       rs232_rts_o_nxt = rs232_rts_o;
       rs232_rts_o_rst = rst_soft_i;
+      // rs232_rts_o_rstval = 1'b1;  // Causes Py2HWSW to generate a reg with reset value = 1'b1
       rs232_rts_o_en = rx_en_i;
 
       rx_data_o_nxt = rx_data_o;
@@ -400,7 +401,7 @@ def setup(py_params_dict):
       case (rx_pc)
 
          0: begin  //sync up
-            rs232_rts_o_nxt   = 1'b1;
+            rs232_rts_o_nxt   = 1'b0;
             rx_ready_o_nxt    = 1'b0;
             rx_cyclecnt_nxt = 16'd1;
             rx_bitcnt_nxt   = 4'd0;

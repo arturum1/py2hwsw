@@ -37,6 +37,7 @@ class iob_comb(iob_snippet):
             r"^\s*(\w+)\s*(?:\[[^\]]*\])?\s*<=", re.MULTILINE
         )
         nxt_regex = re.compile(r"[a-zA-Z0-9_$]+_nxt", re.MULTILINE)
+        rst_values = dict(re.compile(r"^\s*//\s*(\w+)_rstval\s*(?:\[[^\]]*\])?\s*=\s*([^;\s]+)", re.MULTILINE).findall(self.verilog_code))
 
         outputs = set()
         nxt_vars = set()
@@ -88,6 +89,7 @@ class iob_comb(iob_snippet):
                         f"Could not find signal '{signal_name[:-4]}' in wires of '{core.name}' for register implied by '{signal_name}'."
                     )
                 signal.reg_signals.append("_rst")
+                signal.rst_val = rst_values.get(signal_name[:-4], "0")
             elif signal_name.endswith("_en"):
                 signal = find_signal_in_wires(core.wires + core.ports, signal_name[:-3])
                 if not signal:
@@ -234,7 +236,7 @@ class iob_comb(iob_snippet):
                         core.create_subblock(
                             core_name="iob_reg",
                             instance_name=f"{signal.name}_reg",
-                            parameters={"DATA_W": signal.width, "RST_VAL": 0},
+                            parameters={"DATA_W": signal.width, "RST_VAL": signal.rst_val},
                             connect=connect,
                             port_params={"clk_en_rst_s": port_params},
                             instance_description=f"{signal.name} register",

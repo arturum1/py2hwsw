@@ -380,6 +380,7 @@ def setup(py_params: dict):
             "name": py_params.get("name", "iob_system_linux"),
             "build_dir": py_params["build_dir"],
             "hardcoded_plic_cint": False,
+            "bootargs": "rootwait console=ttyS0,115200 earlycon=sbi root=/dev/ram0 init=/sbin/init swiotlb=32 loglevel=8",
         }
         generate_dts(dts_parameters)
 

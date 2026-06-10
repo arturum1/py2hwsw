@@ -88,6 +88,13 @@ expect {
     timeout 20 goto on_timeout
 }
 
+# print "\n[minicom] Run UART16550 tests"
+# send "./uart16550/validate_uart.sh"
+# expect {
+#     "#"
+#     timeout 60 goto on_timeout
+# }
+
 #
 # Tests complete
 #

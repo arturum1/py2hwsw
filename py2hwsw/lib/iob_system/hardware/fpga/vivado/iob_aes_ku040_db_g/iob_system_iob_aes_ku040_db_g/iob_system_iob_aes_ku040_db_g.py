@@ -156,7 +156,7 @@ def setup(py_params_dict):
                 {"name": "rxd_i"},
                 {"name": "txd_o"},
                 {"name": "rs232_rts", "width": "1"},
-                {"name": "high", "width": "1"},
+                {"name": "low", "width": "1"},
             ],
         },
     ]
@@ -397,6 +397,7 @@ def setup(py_params_dict):
             "verilog_code": """
     // General connections
     assign high = 1'b1;
+    assign low = 1'b0;
     assign cke = 1'b1;
 """,
         },
@@ -406,7 +407,6 @@ def setup(py_params_dict):
             {
                 "verilog_code": """
     // Ethernet connections
-    assign low = 1'b0;
     assign enet_resetn_inv = ~enet_resetn_o;
 
     //MII
