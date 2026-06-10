@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 BOARD_SERVER=$(CYC5_SERVER)
 BOARD_USER=$(CYC5_USER)

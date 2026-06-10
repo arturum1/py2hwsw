@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 VFLAGS+=-W all -g2005-sv -I. -I./src -I../src -I../common_src
 VFLAGS+=$(addprefix -I,$(INCLUDE_DIRS))

@@ -2,7 +2,7 @@
 
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 echo "Verify that CLINT (RISC-V timer) interrupts triggered (interrupt count > 0)"
 

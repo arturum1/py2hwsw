@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Notes:
 # - regarrays, regfiles, and rams should use an iob_asym_converter_m_s between CSR and CORE to implement 'asym'.

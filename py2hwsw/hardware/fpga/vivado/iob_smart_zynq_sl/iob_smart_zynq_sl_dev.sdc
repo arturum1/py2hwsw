@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Constraints for Smart Zynq SL board, based on: http://www.hellofpga.com/wp-content/uploads/2023/05/SmartZynq_SL_Schematic_V1d3_20241005.pdf
 # Demo vivado project for this board: http://www.hellofpga.com/index.php/2023/04/27/smart-zynq_sp_sl_01_led/

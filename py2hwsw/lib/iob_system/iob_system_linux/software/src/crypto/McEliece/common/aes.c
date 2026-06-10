@@ -1,6 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2016 Thomas Pornin <pornin@bolet.org>
- * SPDX-FileCopyrightText: 2025 IObundle
+ * SPDX-FileCopyrightText: 2026 IObundle
  *
  * SPDX-License-Identifier: MIT
  */

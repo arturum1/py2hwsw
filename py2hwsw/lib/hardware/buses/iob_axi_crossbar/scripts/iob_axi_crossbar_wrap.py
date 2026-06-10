@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # SPDX-FileCopyrightText: 2018 Alex Forencich
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
 # SPDX-License-Identifier: MIT
 
@@ -52,7 +52,7 @@ def generate(ports=4, name=None, output=None):
     t = Template(
         """\
 // SPDX-FileCopyrightText: 2018 Alex Forencich
-// SPDX-FileCopyrightText: 2025 IObundle
+// SPDX-FileCopyrightText: 2026 IObundle
 //
 // SPDX-License-Identifier: MIT
 
