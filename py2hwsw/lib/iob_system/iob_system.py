@@ -905,6 +905,7 @@ def setup(py_params: dict):
                         "phy_rstn_o": "phy_rstn_o",
                         "mii_io": "mii_io",
                     },
+                    "plic_source_id": 2,
                 },
             ]
     attributes_dict["superblocks"] = [

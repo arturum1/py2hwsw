@@ -135,6 +135,8 @@ def setup(py_params_dict):
                     {"name": "enet_tx_d3_o", "width": "1"},
                     {"name": "enet_tx_en_o", "width": "1"},
                     # {"name": "enet_tx_err_o", "width": "1"},
+                    {"name": "enet_mdio_io", "width": "1"},
+                    {"name": "enet_mdc_o", "width": "1"},
                 ],
             },
         ]
@@ -394,6 +396,9 @@ def setup(py_params_dict):
 
     assign mii_col = 1'b0;
     assign mii_crs = 1'b0;
+
+    assign enet_mdc_o = mii_mdc;
+    assign enet_mdio_io = mii_mdio;
 """,
             },
         ]

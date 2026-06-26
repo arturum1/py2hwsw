@@ -50,7 +50,7 @@ def setup(py_params: dict):
     # Verilog snippets
     #
     verilog_snippet = """
-   assign interrupts = {{27{1'b0}}, uart2_interrupt, uart1_interrupt, uart0_interrupt, timer0_interrupt, 1'b0};
+   assign interrupts = {{26{1'b0}}, uart2_interrupt, uart1_interrupt, uart0_interrupt, eth0_interrupt, timer0_interrupt, 1'b0};
 """
 
     if params["dma_demo"]:
@@ -181,7 +181,7 @@ def setup(py_params: dict):
                     "rs232_m": "rs232_m",
                     "interrupt_o": "uart0_interrupt",
                 },
-                "plic_source_id": 2,
+                "plic_source_id": 3,
             },
             {
                 # Instantiate a UART16550 core from: https://github.com/IObundle/iob-uart16550
@@ -196,7 +196,7 @@ def setup(py_params: dict):
                     "rs232_m": "internal_rs232",
                     "interrupt_o": "uart1_interrupt",
                 },
-                "plic_source_id": 3,
+                "plic_source_id": 4,
             },
             {
                 # Instantiate a UART16550 core from: https://github.com/IObundle/iob-uart16550
@@ -211,7 +211,7 @@ def setup(py_params: dict):
                     "rs232_m": "internal_rs232_inverted",
                     "interrupt_o": "uart2_interrupt",
                 },
-                "plic_source_id": 4,
+                "plic_source_id": 5,
             },
             # {
             #     # Instantiate a VERSAT core from: https://github.com/IObundle/iob-versat
