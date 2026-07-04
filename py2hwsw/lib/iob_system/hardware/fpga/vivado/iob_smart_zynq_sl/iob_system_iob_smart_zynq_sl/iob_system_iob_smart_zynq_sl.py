@@ -28,13 +28,13 @@ def setup(py_params_dict):
                 "name": "AXI_LEN_W",
                 "descr": "AXI burst length width",
                 "type": "D",
-                "val": "8",
+                "val": "4",
                 "min": "1",
                 "max": "8",
             },
             {
                 "name": "AXI_ADDR_W",
-                "descr": "AXI address bus width. 2**29 byte-addresses for 512 MiB of DDR3 memory.",
+                "descr": "AXI address bus width. 2**29 byte-addresses for 512 MiB of DDR3 memory. Note: Even though the full DDR address range for this board is [0x00000000, 0x1FFFFFFF], the PS7 HP0 interface can only access the range [0x00080000, 0x1FFFFFFF].",
                 "type": "D",
                 "val": "29",
                 "min": "1",
@@ -167,13 +167,13 @@ def setup(py_params_dict):
         },
         {
             "name": "axi",
-            "descr": "AXI interface to connect SoC to PS DDR",
+            "descr": "AXI interface to connect Address Translator to PS7 DDR",
             "signals": {
                 "type": "axi",
                 "ID_W": "AXI_ID_W",
                 "ADDR_W": "AXI_ADDR_W",
                 "DATA_W": "AXI_DATA_W",
-                "LEN_W": "AXI_LEN_W",
+                "LEN_W": 8,
                 "PROT_W": 3,
                 "LOCK_W": 1,
             },
@@ -187,6 +187,23 @@ def setup(py_params_dict):
             },
         },
     ]
+    if params["use_extmem"]:
+        attributes_dict["wires"] += [
+            {
+                "name": "soc_axi",
+                "descr": "AXI interface to connect SoC to Address Translator",
+                "signals": {
+                    "type": "axi",
+                    "prefix": "soc_",
+                    "ID_W": "AXI_ID_W",
+                    "ADDR_W": "AXI_ADDR_W",
+                    "DATA_W": "AXI_DATA_W",
+                    "LEN_W": 8,
+                    "PROT_W": 3,
+                    "LOCK_W": 1,
+                },
+            },
+        ]
     if params["use_ethernet"]:
         attributes_dict["wires"] += [
             {
@@ -239,7 +256,7 @@ def setup(py_params_dict):
             "instance_description": "IOb-System instance",
             "parameters": {
                 "AXI_ID_W": "AXI_ID_W",
-                "AXI_LEN_W": "8",  # SoC expects AXI4
+                "AXI_LEN_W": "AXI_LEN_W",
                 "AXI_ADDR_W": "AXI_ADDR_W",
                 "AXI_DATA_W": "AXI_DATA_W",
             },
@@ -251,7 +268,7 @@ def setup(py_params_dict):
         },
     ]
     if params["use_extmem"]:
-        attributes_dict["subblocks"][-1]["connect"].update({"axi_m": "axi"})
+        attributes_dict["subblocks"][-1]["connect"].update({"axi_m": "soc_axi"})
     if params["use_ethernet"]:
         attributes_dict["subblocks"][-1]["connect"].update({"mii_io": "mii"})
         attributes_dict["subblocks"][-1]["connect"].update({"phy_rstn_o": "phy_rstn"})
@@ -269,6 +286,34 @@ def setup(py_params_dict):
                 "connect": {
                     "io_io": "oddr_io",
                 },
+            },
+        ]
+    if params["use_extmem"]:
+        attributes_dict["subblocks"] += [
+            {
+                "core_name": "iob_address_translator",
+                "instance_name": "ps7_ddr_address_translator",
+                "instance_description": "AXI Address Translator to offset all addresses requested by SoC by 0x80000, since PS7 DDR memory can only be accessed from HP0 interface starting at 0x80000.",
+                "parameters": {
+                    "ID_W": "AXI_ID_W",
+                    "ADDR_W": "AXI_ADDR_W",
+                    "DATA_W": "AXI_DATA_W",
+                    "LEN_W": 8,
+                    "PROT_W": 3,
+                    "LOCK_W": 1,
+                },
+                "connect": {
+                    "subordinate_s": "soc_axi",
+                    "manager_m": "axi",
+                },
+                "name": "ps7_ddr_address_translator",
+                "interface": "axi",
+                "has_prot": True,
+                "memory_zones": [
+                    # (Initial zone address, Last zone address (inclusive), Offset to add (for translation))
+                    # Offset all addresses requested by SoC by 0x80000, since PS7 DDR memory can only be accessed from HP0 interface starting at 0x80000.
+                    (0x0, 0x1FFFFFFF, 0x00080000),
+                ],
             },
         ]
 
@@ -397,6 +442,12 @@ def setup(py_params_dict):
     assign axi_arqos = 'b0;
     assign axi_arvalid = 'b0;
     assign axi_rready = 'b0;
+"""
+    else:
+        verilog_snippet += """
+    // Drive unused AXI protection signals to 0
+    assign soc_axi_arprot = 3'b000;
+    assign soc_axi_awprot = 3'b000;
 """
     if params["use_ethernet"]:
         verilog_snippet += """
