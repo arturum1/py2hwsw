@@ -107,6 +107,10 @@ build_deps: $(RUN_DEPS)
 
 run_deps: $(RUN_DEPS)
 
+# Launch Vivado GUI with Block Design, stopping before synthesis
+gui: $(VHDR) $(VSRC)
+	$(MAKE) fpga-bd-gui
+
 debug:
 	@echo SIMULATOR=$(SIMULATOR)
 	@echo BOARD=$(BOARD)
@@ -117,4 +121,4 @@ debug:
 
 .PRECIOUS: $(FPGA_OBJ) test.log s_fw.bin
 
-.PHONY: run build clean debug test build_deps run_deps $(TEST_LIST)
+.PHONY: run build clean debug test build_deps run_deps gui $(TEST_LIST)

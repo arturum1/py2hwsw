@@ -27,10 +27,16 @@ export RDI_VERBOSE = False
 
 VIVADO_FLAGS= -nojournal -log reports/vivado.log -mode batch -source vivado/build.tcl -tclargs $(NAME) $(FPGA_TOP) $(CSR_IF) $(BOARD) "$(VSRC)" " $(INCLUDE_DIRS)" $(IS_FPGA) $(USE_EXTMEM) $(USE_ETHERNET)
 
+GUI_BD_FLAGS= -nojournal -log vivado.log -mode gui -source vivado/gui_bd.tcl -tclargs $(NAME) $(FPGA_TOP) $(CSR_IF) $(BOARD) "$(VSRC)" " $(INCLUDE_DIRS)" $(IS_FPGA) $(USE_EXTMEM) $(USE_ETHERNET)
+
 $(FPGA_OBJ): $(VSRC) $(VHDR) $(wildcard $(BOARD)/*.sdc)
 	mkdir -p reports && vivado $(VIVADO_FLAGS) 
+
+# Launch Vivado GUI with Block Design setup, stopping before synthesis
+fpga-bd-gui:
+	mkdir -p reports && vivado $(GUI_BD_FLAGS)
 
 vivado-clean:
 	@rm -rf .Xil
 
-.PHONY: vivado-clean
+.PHONY: vivado-clean fpga-bd-gui
