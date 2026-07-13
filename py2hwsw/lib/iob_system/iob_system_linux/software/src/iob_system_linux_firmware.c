@@ -7,9 +7,9 @@
 #include "clint.h"
 #include "iob_bsp.h"
 #include "iob_printf.h"
-#include "iob_spi.h"
-#include "iob_spidefs.h"
-#include "iob_spiplatform.h"
+// #include "iob_spi.h"
+// #include "iob_spidefs.h"
+// #include "iob_spiplatform.h"
 #include "iob_system_linux_conf.h"
 #include "iob_system_linux_mmap.h"
 #include "iob_uart16550.h"
@@ -169,190 +169,197 @@ int main() {
   // Global interrupt disable
   csr_clr_bits_mstatus(MSTATUS_MIE_BIT_MASK);
 
-#ifdef SIMULATION
-#ifndef VERILATOR
-  unsigned int word = 0xA3A2A1A0;
-  unsigned int address = 0x000100;
-  unsigned int read_mem = 0xF0F0F0F0;
-  printf("\nTest: %x, %x.\n", word, read_mem);
-  // init spi flash controller
-  spiflash_init(SPI0_BASE);
-  printf("\nTesting SPI flash controller\n");
-  // Reading Status Reg
-  unsigned int reg = 0x00;
-  spiflash_readStatusReg(&reg);
-  printf("\nStatus reg (%x)\n", reg);
-
-  // Testing Fast Read in single, dual, quad
-  unsigned bytes = 4, readid = 0;
-  unsigned frame = 0x00000000;
-  unsigned commFastRead = 0x0b;
-  unsigned fastReadmem0 = 0, fastReadmem1 = 0, fastReadmem2 = 0;
-  unsigned dummycycles = 8;
-
-  // Read ID
-  bytes = 4;
-  readid = 0;
-  spiflash_executecommand(COMMANS, 0, 0, ((bytes * 8) << 8) | READ_ID, &readid);
-
-  printf("\nREAD_ID: (%x)\n", readid);
-  // Read from flash memory
-  printf("\nReading from flash (address: (%x))\n", address);
-  read_mem = spiflash_readmem(address);
-
-  if (word == read_mem) {
-    printf("\nMemory Read (%x) got same word as Programmed(%x)\nSuccess\n",
-           read_mem, word);
-  } else {
-    printf("\nDifferent word from memory\nRead: (%x), Programmed: (%x)\n",
-           read_mem, word);
-    test_result = 1;
-  }
-
-  address = 0x0;
-  read_mem = 1;
-  printf("\nTesting dual output fast read\n");
-  read_mem = spiflash_readfastDualOutput(address, 0);
-  printf("\nRead from memory address (%x) the word: (%x)\n", address, read_mem);
-  word = read_mem;
-
-  read_mem = 2;
-  printf("\nTesting quad output fast read\n");
-  read_mem = spiflash_readfastQuadOutput(address, 0);
-  if (read_mem == word) {
-    printf(
-        "\nQuadFastOutput Read (%x) got same word as Expected (%x)\nSuccess\n",
-        address, read_mem);
-  } else {
-    printf("\nQuadFastOutput Read (%x) Different word from memory\nRead: (%x), "
-           "Read: (%x),Expected: (%x)\n",
-           address, read_mem, word);
-    test_result = 1;
-  }
-
-  read_mem = 3;
-  printf("\nTesting dual input output fast read 0xbb\n");
-  read_mem = spiflash_readfastDualInOutput(address, 0);
-  if (read_mem == word) {
-    printf("\nDualFastInOutput Read (%x) got same word as Expected "
-           "(%x)\nSuccess\n",
-           address, read_mem);
-  } else {
-    printf("\nDualFastInOutput Read (%x) Different word from memory\nRead: "
-           "(%x), Read: (%x),Expected: (%x)\n",
-           address, read_mem, word);
-    test_result = 1;
-  }
-
-  read_mem = 4;
-  printf("\nTesting quad input output fast read 0xeb\n");
-  read_mem = spiflash_readfastQuadInOutput(address, 0);
-  if (read_mem == word) {
-    printf("\nQuadFastInOutput Read (%x) got same word as Expected "
-           "(%x)\nSuccess\n",
-           address, read_mem);
-  } else {
-    printf("\nQuadFastInOutput Read (%x) Different word from memory\nRead: "
-           "(%x), Read: (%x),Expected: (%x)\n",
-           address, read_mem, word);
-    test_result = 1;
-  }
-
-  printf("\nRead Non volatile Register\n");
-  unsigned nonVolatileReg = 0;
-  bytes = 2;
-  unsigned command_aux = 0xb5;
-  spiflash_executecommand(COMMANS, 0, 0, ((bytes * 8) << 8) | command_aux,
-                          &nonVolatileReg);
-  printf("\nNon volatile Register (16 bits):(%x)\n", nonVolatileReg);
-
-  printf("\nRead enhanced volatile Register\n");
-  unsigned enhancedReg = 0;
-  bytes = 1;
-  command_aux = 0x65;
-  frame = 0x00000000;
-  spiflash_executecommand(COMMANS, 0, 0,
-                          (frame << 20) | ((bytes * 8) << 8) | command_aux,
-                          &enhancedReg);
-  printf("\nEnhanced volatile Register (8 bits):(%x)\n", enhancedReg);
-
-  // Testing xip bit enabling and xip termination sequence
-  printf("\nTesting xip enabling through volatile bit and termination by "
-         "sequence\n");
-  unsigned volconfigReg = 0;
-
-  printf("\nResetting flash registers...\n");
-  spiflash_resetmem();
-
-  spiflash_readVolConfigReg(&volconfigReg);
-  printf("\nVolatile Configuration Register (8 bits):(%x)\n", volconfigReg);
-
-  spiflash_XipEnable();
-
-  volconfigReg = 0;
-  spiflash_readVolConfigReg(&volconfigReg);
-  printf(
-      "\nAfter xip bit write, Volatile Configuration Register (8 bits):(%x)\n",
-      volconfigReg);
-
-  // Confirmation bit 0
-  read_mem = 1;
-  printf("\nTesting quad input output fast read with xip confirmation bit 0\n");
-  read_mem = spiflash_readfastQuadInOutput(address, ACTIVEXIP);
-  printf("\nRead from memory address (%x) the word: (%x)\n", address, read_mem);
-  if (read_mem == word) {
-    printf("\nQuadFastInOutput XIP Read (%x) got same word as Expected "
-           "(%x)\nSuccess\n",
-           address, read_mem);
-  } else {
-    printf("\nQuadFastInOutput XIP Read (%x) Different word from memory\nRead: "
-           "(%x), Read: (%x),Expected: (%x)\n",
-           address, read_mem, word);
-    test_result = 1;
-  }
-
-  int xipEnabled = 10;
-  xipEnabled = spiflash_terminateXipSequence();
-  printf("\nAfter xip termination sequence: %d\n", xipEnabled);
-  volconfigReg = 0;
-  spiflash_readVolConfigReg(&volconfigReg);
-  printf("\nAfter xip termination sequence, Volatile Configuration Register (8 "
-         "bits):(%x)\n",
-         volconfigReg);
-
-  // XIP Bit 0 -> XIP ON
-  if (((volconfigReg >> VOLCFG_XIP) & 0x1) == 0) {
-    printf("\nAssuming Xip active, read from memory, confirmation bit 1\n");
-    read_mem = 1;
-    read_mem = spiflash_readMemXip(address, TERMINATEXIP);
-    printf("\nRead from memory address (%x) the word: (%x)\n", address,
-           read_mem);
-  }
-
-  printf("Testing program flash\n");
-  char prog_data[NSAMPLES] = {0};
-  char *char_data = NULL;
-  unsigned int read_data[NSAMPLES] = {0};
-  int sample = 0;
-  for (sample = 0; sample < NSAMPLES; sample++) {
-    prog_data[sample] = sample;
-  }
-  spiflash_memProgram(prog_data, NSAMPLES, 0x104);
-  for (sample = 0; sample < NSAMPLES; sample = sample + 4) {
-    read_data[sample >> 2] = spiflash_readmem(0x104 + sample);
-  }
-  // check prog vs read data
-  char_data = (char *)read_data;
-  for (sample = 0; sample < NSAMPLES; sample++) {
-    if (prog_data[sample] != char_data[sample]) {
-      printf("Error: data[%x] = %08x != read_data[%x] = %08x\n", sample,
-             prog_data[sample], sample, char_data[sample]);
-      test_result = 1;
-    }
-  }
-
-#endif // #ifndef VERILATOR
-#endif // #ifdef SIMULATION
+  // #ifdef SIMULATION
+  // #ifndef VERILATOR
+  //   unsigned int word = 0xA3A2A1A0;
+  //   unsigned int address = 0x000100;
+  //   unsigned int read_mem = 0xF0F0F0F0;
+  //   printf("\nTest: %x, %x.\n", word, read_mem);
+  //   // init spi flash controller
+  //   spiflash_init(SPI0_BASE);
+  //   printf("\nTesting SPI flash controller\n");
+  //   // Reading Status Reg
+  //   unsigned int reg = 0x00;
+  //   spiflash_readStatusReg(&reg);
+  //   printf("\nStatus reg (%x)\n", reg);
+  //
+  //   // Testing Fast Read in single, dual, quad
+  //   unsigned bytes = 4, readid = 0;
+  //   unsigned frame = 0x00000000;
+  //   unsigned commFastRead = 0x0b;
+  //   unsigned fastReadmem0 = 0, fastReadmem1 = 0, fastReadmem2 = 0;
+  //   unsigned dummycycles = 8;
+  //
+  //   // Read ID
+  //   bytes = 4;
+  //   readid = 0;
+  //   spiflash_executecommand(COMMANS, 0, 0, ((bytes * 8) << 8) | READ_ID,
+  //   &readid);
+  //
+  //   printf("\nREAD_ID: (%x)\n", readid);
+  //   // Read from flash memory
+  //   printf("\nReading from flash (address: (%x))\n", address);
+  //   read_mem = spiflash_readmem(address);
+  //
+  //   if (word == read_mem) {
+  //     printf("\nMemory Read (%x) got same word as Programmed(%x)\nSuccess\n",
+  //            read_mem, word);
+  //   } else {
+  //     printf("\nDifferent word from memory\nRead: (%x), Programmed: (%x)\n",
+  //            read_mem, word);
+  //     test_result = 1;
+  //   }
+  //
+  //   address = 0x0;
+  //   read_mem = 1;
+  //   printf("\nTesting dual output fast read\n");
+  //   read_mem = spiflash_readfastDualOutput(address, 0);
+  //   printf("\nRead from memory address (%x) the word: (%x)\n", address,
+  //   read_mem); word = read_mem;
+  //
+  //   read_mem = 2;
+  //   printf("\nTesting quad output fast read\n");
+  //   read_mem = spiflash_readfastQuadOutput(address, 0);
+  //   if (read_mem == word) {
+  //     printf(
+  //         "\nQuadFastOutput Read (%x) got same word as Expected
+  //         (%x)\nSuccess\n", address, read_mem);
+  //   } else {
+  //     printf("\nQuadFastOutput Read (%x) Different word from memory\nRead:
+  //     (%x), "
+  //            "Read: (%x),Expected: (%x)\n",
+  //            address, read_mem, word);
+  //     test_result = 1;
+  //   }
+  //
+  //   read_mem = 3;
+  //   printf("\nTesting dual input output fast read 0xbb\n");
+  //   read_mem = spiflash_readfastDualInOutput(address, 0);
+  //   if (read_mem == word) {
+  //     printf("\nDualFastInOutput Read (%x) got same word as Expected "
+  //            "(%x)\nSuccess\n",
+  //            address, read_mem);
+  //   } else {
+  //     printf("\nDualFastInOutput Read (%x) Different word from memory\nRead:
+  //     "
+  //            "(%x), Read: (%x),Expected: (%x)\n",
+  //            address, read_mem, word);
+  //     test_result = 1;
+  //   }
+  //
+  //   read_mem = 4;
+  //   printf("\nTesting quad input output fast read 0xeb\n");
+  //   read_mem = spiflash_readfastQuadInOutput(address, 0);
+  //   if (read_mem == word) {
+  //     printf("\nQuadFastInOutput Read (%x) got same word as Expected "
+  //            "(%x)\nSuccess\n",
+  //            address, read_mem);
+  //   } else {
+  //     printf("\nQuadFastInOutput Read (%x) Different word from memory\nRead:
+  //     "
+  //            "(%x), Read: (%x),Expected: (%x)\n",
+  //            address, read_mem, word);
+  //     test_result = 1;
+  //   }
+  //
+  //   printf("\nRead Non volatile Register\n");
+  //   unsigned nonVolatileReg = 0;
+  //   bytes = 2;
+  //   unsigned command_aux = 0xb5;
+  //   spiflash_executecommand(COMMANS, 0, 0, ((bytes * 8) << 8) | command_aux,
+  //                           &nonVolatileReg);
+  //   printf("\nNon volatile Register (16 bits):(%x)\n", nonVolatileReg);
+  //
+  //   printf("\nRead enhanced volatile Register\n");
+  //   unsigned enhancedReg = 0;
+  //   bytes = 1;
+  //   command_aux = 0x65;
+  //   frame = 0x00000000;
+  //   spiflash_executecommand(COMMANS, 0, 0,
+  //                           (frame << 20) | ((bytes * 8) << 8) | command_aux,
+  //                           &enhancedReg);
+  //   printf("\nEnhanced volatile Register (8 bits):(%x)\n", enhancedReg);
+  //
+  //   // Testing xip bit enabling and xip termination sequence
+  //   printf("\nTesting xip enabling through volatile bit and termination by "
+  //          "sequence\n");
+  //   unsigned volconfigReg = 0;
+  //
+  //   printf("\nResetting flash registers...\n");
+  //   spiflash_resetmem();
+  //
+  //   spiflash_readVolConfigReg(&volconfigReg);
+  //   printf("\nVolatile Configuration Register (8 bits):(%x)\n",
+  //   volconfigReg);
+  //
+  //   spiflash_XipEnable();
+  //
+  //   volconfigReg = 0;
+  //   spiflash_readVolConfigReg(&volconfigReg);
+  //   printf(
+  //       "\nAfter xip bit write, Volatile Configuration Register (8
+  //       bits):(%x)\n", volconfigReg);
+  //
+  //   // Confirmation bit 0
+  //   read_mem = 1;
+  //   printf("\nTesting quad input output fast read with xip confirmation bit
+  //   0\n"); read_mem = spiflash_readfastQuadInOutput(address, ACTIVEXIP);
+  //   printf("\nRead from memory address (%x) the word: (%x)\n", address,
+  //   read_mem); if (read_mem == word) {
+  //     printf("\nQuadFastInOutput XIP Read (%x) got same word as Expected "
+  //            "(%x)\nSuccess\n",
+  //            address, read_mem);
+  //   } else {
+  //     printf("\nQuadFastInOutput XIP Read (%x) Different word from
+  //     memory\nRead: "
+  //            "(%x), Read: (%x),Expected: (%x)\n",
+  //            address, read_mem, word);
+  //     test_result = 1;
+  //   }
+  //
+  //   int xipEnabled = 10;
+  //   xipEnabled = spiflash_terminateXipSequence();
+  //   printf("\nAfter xip termination sequence: %d\n", xipEnabled);
+  //   volconfigReg = 0;
+  //   spiflash_readVolConfigReg(&volconfigReg);
+  //   printf("\nAfter xip termination sequence, Volatile Configuration Register
+  //   (8 "
+  //          "bits):(%x)\n",
+  //          volconfigReg);
+  //
+  //   // XIP Bit 0 -> XIP ON
+  //   if (((volconfigReg >> VOLCFG_XIP) & 0x1) == 0) {
+  //     printf("\nAssuming Xip active, read from memory, confirmation bit
+  //     1\n"); read_mem = 1; read_mem = spiflash_readMemXip(address,
+  //     TERMINATEXIP); printf("\nRead from memory address (%x) the word:
+  //     (%x)\n", address,
+  //            read_mem);
+  //   }
+  //
+  //   printf("Testing program flash\n");
+  //   char prog_data[NSAMPLES] = {0};
+  //   char *char_data = NULL;
+  //   unsigned int read_data[NSAMPLES] = {0};
+  //   int sample = 0;
+  //   for (sample = 0; sample < NSAMPLES; sample++) {
+  //     prog_data[sample] = sample;
+  //   }
+  //   spiflash_memProgram(prog_data, NSAMPLES, 0x104);
+  //   for (sample = 0; sample < NSAMPLES; sample = sample + 4) {
+  //     read_data[sample >> 2] = spiflash_readmem(0x104 + sample);
+  //   }
+  //   // check prog vs read data
+  //   char_data = (char *)read_data;
+  //   for (sample = 0; sample < NSAMPLES; sample++) {
+  //     if (prog_data[sample] != char_data[sample]) {
+  //       printf("Error: data[%x] = %08x != read_data[%x] = %08x\n", sample,
+  //              prog_data[sample], sample, char_data[sample]);
+  //       test_result = 1;
+  //     }
+  //   }
+  //
+  // #endif // #ifndef VERILATOR
+  // #endif // #ifdef SIMULATION
 
 #ifdef IOB_SYSTEM_LINUX_VERSAT_DEMO
   // Tests are too big and slow to perform during simulation.

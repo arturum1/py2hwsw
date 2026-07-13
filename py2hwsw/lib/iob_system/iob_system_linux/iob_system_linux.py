@@ -84,14 +84,6 @@ def setup(py_params: dict):
                 "min": "1",
                 "max": "32",
             },
-            {  # For iob_spi_master
-                "name": "FPGA_TOOL",
-                "descr": "Use IPs from fpga tool. Avaliable options: 'XILINX', 'other'.",
-                "type": "P",
-                "val": '"other"',
-                "min": "NA",
-                "max": "NA",
-            },
             # {
             #     "name": "DMA_DEMO",
             #     "type": "M",
@@ -145,27 +137,27 @@ def setup(py_params: dict):
                 ],
             },
             # SPI master
+            # # {
+            # #     "name": "spi_cache",
+            # #     "descr": "SPI cache bus",
+            # #     "if_defined": "RUN_FLASH",
+            # #     "signals": {
+            # #         "type": "iob",
+            # #         "prefix": "spi_",
+            # #     },
+            # # },
             # {
-            #     "name": "spi_cache",
-            #     "descr": "SPI cache bus",
-            #     "if_defined": "RUN_FLASH",
-            #     "signals": {
-            #         "type": "iob",
-            #         "prefix": "spi_",
-            #     },
+            #     "name": "spi_flash",
+            #     "descr": "SPI flash bus",
+            #     "signals": [
+            #         {"name": "ss", "width": 1},
+            #         {"name": "sclk", "width": 1},
+            #         {"name": "miso", "width": 1},
+            #         {"name": "mosi", "width": 1},
+            #         {"name": "wp_n", "width": 1},
+            #         {"name": "hold_n", "width": 1},
+            #     ],
             # },
-            {
-                "name": "spi_flash",
-                "descr": "SPI flash bus",
-                "signals": [
-                    {"name": "ss", "width": 1},
-                    {"name": "sclk", "width": 1},
-                    {"name": "miso", "width": 1},
-                    {"name": "mosi", "width": 1},
-                    {"name": "wp_n", "width": 1},
-                    {"name": "hold_n", "width": 1},
-                ],
-            },
         ],
         "subblocks": [
             {
@@ -226,22 +218,23 @@ def setup(py_params: dict):
             #         # TODO:
             #     },
             # },
-            {
-                # Instantiate a SPI master core from: https://github.com/IObundle/iob-spi
-                "core_name": "iob_spi_master",
-                "instance_name": "SPI0",
-                "instance_description": "SPI master peripheral",
-                "is_peripheral": True,
-                "parameters": {
-                    "FPGA_TOOL": "FPGA_TOOL",
-                },
-                "connect": {
-                    "clk_en_rst_s": "clk_en_rst_s",
-                    # Cbus connected automatically
-                    # "cache_iob_s": "spi_cache",
-                    "flash_io": "spi_flash",
-                },
-            },
+            #
+            # {
+            #     # Instantiate a SPI master core from: https://github.com/IObundle/iob-spi
+            #     "core_name": "iob_spi_master",
+            #     "instance_name": "SPI0",
+            #     "instance_description": "SPI master peripheral",
+            #     "is_peripheral": True,
+            #     "parameters": {
+            #         "FPGA_TOOL": "FPGA_TOOL",
+            #     },
+            #     "connect": {
+            #         "clk_en_rst_s": "clk_en_rst_s",
+            #         # Cbus connected automatically
+            #         # "cache_iob_s": "spi_cache",
+            #         "flash_io": "spi_flash",
+            #     },
+            # },
             #
             # Peripherals for DMA demo
             # {
