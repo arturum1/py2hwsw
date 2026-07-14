@@ -17,7 +17,7 @@ COV_SFLAGS= -covoverwrite -covtest $(COV_TEST)
 COV_EFLAGS= -covdut $(NAME) -coverage A -covfile xcelium_cov_commands.ccf
 endif
 
-VFLAGS+=$(SFLAGS) -update -linedebug -sv -incdir .
+VFLAGS+=-update -linedebug -sv -incdir .
 
 ifneq ($(wildcard ../src),)
 VFLAGS+=-incdir ../src
@@ -51,16 +51,16 @@ endif
 
 xmvlog.log: $(VHDR) $(VSRC)
 ifeq ($(TBTYPE),UVM)
-	xrun -compile -uvm -sv -uvmhome $(UVM_HOME) -sv_lib $(UVM_HOME)/src/dpi/uvm_dpi $(VFLAGS) $(VSRC) src/iob_uvm_tb.sv +UVM_TESTNAME=iob_test
+	xrun -compile $(SFLAGS) -uvm -sv -uvmhome $(UVM_HOME) -sv_lib $(UVM_HOME)/src/dpi/uvm_dpi $(VFLAGS) $(VSRC) src/iob_uvm_tb.sv +UVM_TESTNAME=iob_test
 else
-	xrun -compile $(VFLAGS) $(VSRC)
+	xrun -compile $(SFLAGS) $(VFLAGS) $(VSRC)
 endif
 
 xmelab.log : xmvlog.log xcelium.d/worklib
 ifeq ($(TBTYPE),UVM)
 	xrun -elaborate -uvm -sv  -uvmhome $(UVM_HOME) $(VFLAGS) $(EFLAGS) -incdir ./src src/iob_uvm_tb.sv +UVM_TESTNAME=iob_test
 else
-	xmelab $(EFLAGS) $(COV_EFLAGS) worklib.$(TB):v
+	xrun -elaborate $(VFLAGS) $(EFLAGS) $(COV_EFLAGS) ./src/$(TB).v
 endif
 
 comp: xmelab.log
