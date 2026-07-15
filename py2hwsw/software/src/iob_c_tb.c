@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-#include <fcntl.h>   // For open, O_RDWR
+#include <fcntl.h> // For open, O_RDWR
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
