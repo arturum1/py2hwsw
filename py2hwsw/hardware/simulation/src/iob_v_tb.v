@@ -78,7 +78,7 @@ module iob_v_tb;
       // Server loop
       while (1) begin
          //read request from named pipe: Will block simulation until request is available
-         if ($fread(buffer, c2v_read_fp, 0, 45) != 45) begin
+         if ($fread(buffer, c2v_read_fp) != 45) begin
             $display("V: Error: did not read expected 45 bytes from c2v.txt");
             $finish;
          end
