@@ -69,7 +69,8 @@ exec: comp
 ifeq ($(TBTYPE),UVM)
 	sync && sleep 2 && xrun -R $(SFLAGS) -sv_lib worklib.iob_uvm_tb:sv +UVM_TESTNAME=iob_test
 else
-	sync && sleep 2 && xmsim $(SFLAGS) $(COV_SFLAGS) worklib.$(TB):v
+	printf 'run\nexit\n' > xmsim_run.tcl
+	sync && sleep 2 && xmsim $(SFLAGS) $(COV_SFLAGS) -input xmsim_run.tcl worklib.$(TB):v
 endif
 ifeq ($(COV),1)
 	ls -d cov_work/scope/* > all_ucd_file
@@ -79,7 +80,7 @@ endif
 
 clean: gen-clean
 	@rm -rf xmelab.log  xmsim.log  xmvlog.log xcelium.d 
-	@rm -f iob_cov_waiver.vRefine
+	@rm -f iob_cov_waiver.vRefine xmsim_run.tcl
 
 very-clean: clean
 	@rm -rf cov_work *.log
