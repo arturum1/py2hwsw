@@ -80,7 +80,7 @@ endif
 
 clean: gen-clean
 	@rm -rf xmelab.log  xmsim.log  xmvlog.log xcelium.d 
-	@rm -f iob_cov_waiver.vRefine
+	@rm -f iob_cov_waiver.vRefine xmsim_run.tcl
 
 very-clean: clean
 	@rm -rf cov_work *.log
