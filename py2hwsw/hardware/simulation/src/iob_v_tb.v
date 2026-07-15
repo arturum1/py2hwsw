@@ -149,7 +149,8 @@ module iob_v_tb;
 
          #1 while (!iob_ready_o) #1;
 
-         @(posedge clk) iob_valid_i = 0;
+         // Deassert one time step after the edge, so it doesn't race with the DUT's @(posedge clk)
+         @(posedge clk) #1 iob_valid_i = 0;
          iob_wstrb_i = 0;
       end
    endtask
