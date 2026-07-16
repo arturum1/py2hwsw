@@ -198,7 +198,23 @@ void debug_phy_connection() {
   printf("  Reg 4 (AN Advertisement): 0x%04X\n", advertise);
   printf("  Reg 5 (AN Link Partner Ability): 0x%04X\n", lpa);
 
-  // 3. Test writing to some register to verify write communication
+  // 3. Check link status (before write test to avoid AN disruption)
+  printf("\nChecking link status...\n");
+  uint16_t status = mii_read(phy, 1);
+  int link_up = (status & (1 << 2)) != 0;
+
+  if (link_up) {
+    printf("  [+] SUCCESS: Ethernet link is UP!\n");
+    bmcr = mii_read(phy, 0);
+    printf("  Speed: %s, Duplex: %s\n",
+           ((bmcr >> 13) & 1) ? "100 Mbps" : "10 Mbps",
+           (bmcr >> 8) & 1 ? "Full" : "Half");
+  } else {
+    printf("  [!] WARNING: Ethernet link is DOWN. Please check cable "
+           "connection.\n");
+  }
+
+  // 4. Test writing to some register to verify write communication
   printf("\nTesting MII write to PHY...\n");
   uint16_t orig_bmcr = bmcr;
   uint16_t test_bmcr = orig_bmcr | (1 << 14); // loopback bit
@@ -213,29 +229,6 @@ void debug_phy_connection() {
   }
   // Restore original control register
   mii_write(phy, 0, orig_bmcr);
-
-  // 4. Wait for link up with a timeout
-  printf("\nWaiting for Link to come UP (timeout ~5 seconds)...\n");
-  int link_up = 0;
-  for (int wait_loop = 0; wait_loop < 50; wait_loop++) {
-    uint16_t status = mii_read(phy, 1);
-    if (status & (1 << 2)) {
-      link_up = 1;
-      break;
-    }
-    clint_uDelay(100000, IOB_BSP_FREQ, CLINT0_BASE); // delay 100ms
-  }
-
-  if (link_up) {
-    printf("  [+] SUCCESS: Ethernet link is UP!\n");
-    bmcr = mii_read(phy, 0);
-    printf("  Speed: %s, Duplex: %s\n",
-           ((bmcr >> 13) & 1) ? "100 Mbps" : "10 Mbps",
-           (bmcr >> 8) & 1 ? "Full" : "Half");
-  } else {
-    printf("  [!] WARNING: Ethernet link is DOWN. Please check cable "
-           "connection.\n");
-  }
 
   printf("--- Ethernet PHY Connection Debug Tests Complete ---\n\n");
 }
