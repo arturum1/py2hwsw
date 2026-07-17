@@ -341,7 +341,7 @@ class csr_gen:
             else:
                 lines += f"    assign {name}_addressed = {int_addr_stable_cmp} (internal_iob_addr_stable < ({addr}+(2**({addr_w}))));\n"
 
-            lines += f"   assign {name}_valid{suffix} = internal_iob_valid & {name}_addressed & write_en;\n"
+            lines += f"   assign {name}_valid{suffix} = internal_iob_valid & {name}_addressed;\n"
             if type(log2n_items) is not int or log2n_items > 0:
                 lines += f"   assign {name}_addr{suffix} = internal_iob_addr_stable - {addr};\n"
             wires.append(
@@ -473,7 +473,7 @@ class csr_gen:
                     lines += f"    assign {name}_addressed = (internal_iob_addr_stable >= ({addr})) && (internal_iob_addr_stable < ({addr}+(2**({addr_w}))));\n"
 
                 # Create new valid and addr signals
-                lines += f"   assign {name}_valid{suffix} = internal_iob_valid & {name}_addressed;\n"
+                lines += f"   assign {name}_valid{suffix} = internal_iob_valid & {name}_addressed & ~write_en;\n"
                 if type(log2n_items) is not int or log2n_items > 0:
                     lines += f"   assign {name}_addr{suffix} = internal_iob_addr_stable - {addr};\n"
 
