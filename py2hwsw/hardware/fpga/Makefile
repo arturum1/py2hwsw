@@ -25,7 +25,7 @@ $(exit 0)
 endif
 
 #fpga toolchain
-FPGA_TOOL:=$(shell find . -name $(BOARD) | cut -d"/" -f2)
+FPGA_TOOL:=$(shell find . -mindepth 2 -maxdepth 2 -type d -name $(BOARD) | cut -d"/" -f2)
 
 ifeq ($(FPGA_TOOL),)
 $(warning Unsupported FPGA board $(BOARD) or FPGA toolchain. Check the board name and FPGA toochain installation.)
@@ -111,6 +111,10 @@ run_deps: $(RUN_DEPS)
 gui: $(VHDR) $(VSRC)
 	$(MAKE) fpga-bd-gui
 
+# Launch Vivado GUI, run synthesis, and insert ILA debug core
+debug-ila: $(VHDR) $(VSRC)
+	$(MAKE) fpga-debug-ila
+
 debug:
 	@echo SIMULATOR=$(SIMULATOR)
 	@echo BOARD=$(BOARD)
@@ -121,4 +125,4 @@ debug:
 
 .PRECIOUS: $(FPGA_OBJ) test.log s_fw.bin
 
-.PHONY: run build clean debug test build_deps run_deps gui $(TEST_LIST)
+.PHONY: run build clean debug test build_deps run_deps gui debug-ila $(TEST_LIST)

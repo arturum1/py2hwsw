@@ -121,6 +121,9 @@ fpga-debug:
 fpga-gui:
 	make -C $(FPGA_DIR) gui BOARD=$(BOARD) USE_FPGA=$(USE_FPGA)
 
+fpga-debug-ila:
+	make -C $(FPGA_DIR) debug-ila BOARD=$(BOARD) USE_FPGA=$(USE_FPGA)
+
 fpga-clean:
 	if [ -f "$(FPGA_DIR)/Makefile" ]; then make -C $(FPGA_DIR) clean; fi
 
