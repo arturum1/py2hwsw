@@ -992,7 +992,11 @@ def setup(py_params: dict):
     # riscv_interrupts/riscv_timebase composite wires. When PLIC or CLINT is
     # disabled, the signals that peripheral used to drive are left floating, so
     # tie them off to 0 here.
-    if params["cpu"] != "none" and params["use_peripherals"] and params["include_snippet"]:
+    if (
+        params["cpu"] != "none"
+        and params["use_peripherals"]
+        and params["include_snippet"]
+    ):
         tie_off_code = ""
         if not params["use_plic"]:
             tie_off_code += """
