@@ -67,26 +67,27 @@ set_property top $FPGA_TOP [current_fileset]
 update_compile_order -fileset sources_1
 
 # ========== Run Synthesis ==========
+# Always reset and re-run synthesis so $readmemh picks up the hex file
 set synth_run [get_runs synth_1]
 if { $synth_run != "" } {
-    set progress [get_property PROGRESS $synth_run]
-} else {
-    set progress ""
+    reset_run synth_1
 }
 
-if { $progress != "100%" } {
-    puts "Running synthesis..."
-    if { $synth_run != "" } { reset_run synth_1 }
-    launch_runs synth_1
-    wait_on_run synth_1
-    set progress [get_property PROGRESS [get_runs synth_1]]
-    if { $progress != "100%" } {
-        error "Synthesis failed. Check reports/synth_1 for details."
-    }
-    puts "Synthesis completed successfully."
-} else {
-    puts "Synthesis already completed."
+# Copy hex files into synth_1 where $readmemh resolves from (synthesis subprocess CWD)
+set synth_dir [file normalize ./${BOARD}/${BOARD}.runs/synth_1]
+foreach hexfile [glob -nocomplain *.hex] {
+    puts "Copying $hexfile to $synth_dir"
+    file copy -force [file join [file normalize .] $hexfile] [file join $synth_dir $hexfile]
 }
+
+puts "Running synthesis..."
+launch_runs synth_1
+wait_on_run synth_1
+set progress [get_property PROGRESS [get_runs synth_1]]
+if { $progress != "100%" } {
+    error "Synthesis failed. Check reports/synth_1 for details."
+}
+puts "Synthesis completed successfully."
 
 # ========== ILA Core Insertion ==========
 open_run synth_1
@@ -180,23 +181,15 @@ puts ""
 puts "Running implementation and bitstream generation..."
 set impl_run [get_runs impl_1]
 if { $impl_run != "" } {
-    set progress [get_property PROGRESS $impl_run]
-} else {
-    set progress ""
+    reset_run impl_1
 }
-
+launch_runs impl_1 -to_step write_bitstream
+wait_on_run impl_1
+set progress [get_property PROGRESS [get_runs impl_1]]
 if { $progress != "100%" } {
-    if { $impl_run != "" } { reset_run impl_1 }
-    launch_runs impl_1 -to_step write_bitstream
-    wait_on_run impl_1
-    set progress [get_property PROGRESS [get_runs impl_1]]
-    if { $progress != "100%" } {
-        error "Implementation failed. Check reports/impl_1 for details."
-    }
-    puts "Implementation completed successfully."
-} else {
-    puts "Implementation already completed."
+    error "Implementation failed. Check reports/impl_1 for details."
 }
+puts "Implementation completed successfully."
 
 # ========== Open Hardware Manager ==========
 puts ""

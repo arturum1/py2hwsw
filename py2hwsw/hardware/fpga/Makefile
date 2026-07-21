@@ -112,7 +112,7 @@ gui: $(VHDR) $(VSRC)
 	$(MAKE) fpga-bd-gui
 
 # Launch Vivado GUI, run synthesis, and insert ILA debug core
-debug-ila: $(VHDR) $(VSRC)
+debug-ila: $(VHDR) $(VSRC) $(BUILD_DEPS)
 	$(MAKE) fpga-debug-ila
 
 debug:
