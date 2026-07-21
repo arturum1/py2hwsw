@@ -75,6 +75,7 @@ if { $synth_run != "" } {
 
 # Copy hex files into synth_1 where $readmemh resolves from (synthesis subprocess CWD)
 set synth_dir [file normalize ./${BOARD}/${BOARD}.runs/synth_1]
+file mkdir $synth_dir
 foreach hexfile [glob -nocomplain *.hex] {
     puts "Copying $hexfile to $synth_dir"
     file copy -force [file join [file normalize .] $hexfile] [file join $synth_dir $hexfile]
@@ -92,7 +93,16 @@ puts "Synthesis completed successfully."
 # ========== ILA Core Insertion ==========
 open_run synth_1
 
-# Delete any stale ILA core to force fresh configuration from current mark_debug signals
+# Find all (* mark_debug = "true" *) nets
+set marked_nets [get_nets -hierarchical -filter {MARK_DEBUG == 1}]
+set total_count [llength $marked_nets]
+puts "Found $total_count marked net(s)"
+
+if { $total_count == 0 } {
+    error "No mark_debug nets found in design. Add (* mark_debug = \"true\" *) attributes to signals you want to probe."
+}
+
+# Delete any stale ILA core to force fresh configuration
 if { [get_debug_cores -quiet u_ila_0] != "" } {
     delete_debug_core [get_debug_cores u_ila_0]
 }
@@ -120,34 +130,28 @@ if { $clk_net != "" } {
     error "Could not find a clock net for the ILA."
 }
 
-# Find all (* mark_debug = "true" *) nets
-set marked_nets [get_nets -hierarchical -filter {MARK_DEBUG == 1}]
-set total_count [llength $marked_nets]
-puts "Found $total_count marked net(s)"
-
-# Group nets by base name (collapse bit-selects into bus probes)
-array unset bus_indices
+# Group bit-selects into bus probes; collect actual net names per group
+array unset bus_nets
 set single_nets {}
 foreach net $marked_nets {
     if { [regexp {^(.+)\[(\d+)\]$} $net -> basename idx] } {
-        lappend bus_indices($basename) $idx
+        lappend bus_nets($basename) $net
     } else {
         lappend single_nets $net
     }
 }
 
 set probe_list {}
-# Process bus groups
-foreach basename [array names bus_indices] {
-    set indices [lsort -integer $bus_indices($basename)]
-    set width [expr {[lindex $indices end] - [lindex $indices 0] + 1}]
-    lappend probe_list [list $basename $width]
+# Process bus groups (connect all individual bit-selects, width = actual count)
+foreach basename [array names bus_nets] {
+    set nets [lsort -dictionary $bus_nets($basename)]
+    lappend probe_list [list $nets [llength $nets]]
 }
 # Process standalone nets (no bit-select)
 foreach net $single_nets {
     set width 1
     catch { set width [expr {abs([get_property LEFT $net] - [get_property RIGHT $net]) + 1}] }
-    lappend probe_list [list $net $width]
+    lappend probe_list [list [list $net] $width]
 }
 
 set num_marked [llength $probe_list]
@@ -155,7 +159,7 @@ puts "Consolidated into $num_marked probe(s)"
 
 set i 0
 foreach entry $probe_list {
-    set net [lindex $entry 0]
+    set nets [lindex $entry 0]
     set width [lindex $entry 1]
 
     set pname "probe${i}"
@@ -164,8 +168,8 @@ foreach entry $probe_list {
     }
     set_property port_width $width [get_debug_ports u_ila_0/$pname]
     set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/$pname]
-    connect_debug_port u_ila_0/$pname [list $net]
-    puts "  $pname <- $net  width=$width"
+    connect_debug_port u_ila_0/$pname $nets
+    puts "  $pname <- $width net(s)"
     incr i
 }
 

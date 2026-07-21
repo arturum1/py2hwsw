@@ -108,7 +108,7 @@ build_deps: $(RUN_DEPS)
 run_deps: $(RUN_DEPS)
 
 # Launch Vivado GUI with Block Design, stopping before synthesis
-gui: $(VHDR) $(VSRC)
+gui: $(VHDR) $(VSRC) $(BUILD_DEPS)
 	$(MAKE) fpga-bd-gui
 
 # Launch Vivado GUI, run synthesis, and insert ILA debug core
