@@ -327,7 +327,18 @@ def setup(py_params_dict):
     
     // Connect clk_en_rst sources
     assign cke = 1'b1;
-    assign arst = ~rst_n;
+
+    // Delayed reset: hold arst high for ~128M clocks (~2.56s at 50 MHz) after
+    // FCLK_RESET0_N deasserts, giving the PS7 time to initialize the DDR
+    // controller before the PL starts accessing the HP0 interface.
+    reg [26:0] rst_delay;
+    always @(posedge clk) begin
+       if (!rst_n)
+          rst_delay <= 0;
+       else if (!rst_delay[26])
+          rst_delay <= rst_delay + 1;
+    end
+    assign arst = ~rst_delay[26];
 
     // Connect iob_system uart flow control
     assign uut_rs232_cts = 1'b0;
