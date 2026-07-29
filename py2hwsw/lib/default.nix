@@ -26,7 +26,7 @@
 # python3 pydantic-2.11.1
 # python3 jinja2-3.1.6
 # texlive-combined-2024
-# riscv-gnu-toolchain (tag 2022.06.10)
+# riscv-gnu-toolchain (tag 2026.04.05)
 # verible-0.0.3956
 # black-25.1.0
 # clang-wrapper-14.0.6

@@ -183,8 +183,8 @@ TEMPLATE_LDS=src/$@.lds
 #endif
 #
 ## Compiler FLAGS with custom architecture, including atomic instructions
-#IOB_SYSTEM_LINUX_CFLAGS ?=-Os -nostdlib -march=rv32imac -mabi=ilp32 --specs=nano.specs -Wcast-align=strict $(SIM_DEFINE)
-IOB_SYSTEM_LINUX_CFLAGS ?=-Os -nostdlib -march=rv32imac -mabi=ilp32 --specs=nano.specs -Wcast-align=strict
+#IOB_SYSTEM_LINUX_CFLAGS ?=-Os -nostdlib -march=rv32imac_zicsr_zifencei_zicbom -mabi=ilp32 --specs=nano.specs -Wcast-align=strict $(SIM_DEFINE)
+IOB_SYSTEM_LINUX_CFLAGS ?=-Os -nostdlib -march=rv32imac_zicsr_zifencei_zicbom -mabi=ilp32 --specs=nano.specs -Wcast-align=strict
 
 IOB_SYSTEM_LINUX_INCLUDES=-Isrc
 #IOB_SYSTEM_LINUX_INCLUDES=-Isrc -Isrc/crypto/McEliece -Isrc/crypto/McEliece/common
@@ -216,7 +216,7 @@ IOB_SYSTEM_LINUX_FW_SRC+=src/iob_printf.c
 # UTARGETS+=crypto
 # 
 # crypto:
-# 	riscv64-unknown-linux-gnu-gcc -std=gnu99 -march=rv32imac -mabi=ilp32 -Wcast-align=strict -Os -s -ffunction-sections $(CRYPTO_SRC) -o crypto -Isrc/crypto/McEliece -Isrc/crypto/McEliece/common -Isrc/linux -Wl,-gc-sections -Wl,--strip-all
+# 	riscv64-unknown-linux-gnu-gcc -std=gnu99 -march=rv32imac_zicsr_zifencei_zicbom -mabi=ilp32 -Wcast-align=strict -Os -s -ffunction-sections $(CRYPTO_SRC) -o crypto -Isrc/crypto/McEliece -Isrc/crypto/McEliece/common -Isrc/linux -Wl,-gc-sections -Wl,--strip-all
 # 
 # .PHONY: crypto
 

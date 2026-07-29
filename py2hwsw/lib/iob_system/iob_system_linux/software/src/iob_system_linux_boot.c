@@ -368,16 +368,6 @@ int main() {
 #endif
 #endif // INIT_MEM
 
-  // Clear CPU registers, to not pass arguments to the next
-  asm volatile("li a0,0");
-  asm volatile("li a1,0");
-  asm volatile("li a2,0");
-  asm volatile("li a3,0");
-  asm volatile("li a4,0");
-  asm volatile("li a5,0");
-  asm volatile("li a6,0");
-  asm volatile("li a7,0");
-
   // run firmware
   uart16550_puts(PROGNAME);
   uart16550_puts(": Restart CPU to run user program...\n");
