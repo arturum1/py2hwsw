@@ -419,6 +419,11 @@ def setup(py_params_dict):
     assign mii_col          = 1'b0;
     assign mii_crs          = 1'b0;
 
+    // Weak pull-up on mdio signals, so that iob_eth drivers can tell there is no PHY attached.
+    // Maybe we should define these wires as 'wand' instead of 'wire'?
+    assign tb_mii_mdio = 1'b1;
+    assign mii_mdio = 1'b1;
+
 """,
             },
         ]

@@ -285,7 +285,7 @@ int main() {
 
 #ifdef IOB_SYSTEM_LINUX_USE_ETHERNET
   // Init ethernet
-  eth_init(ETH0_BASE, &clear_cache);
+  eth_init(ETH0_BASE, IOB_BSP_FREQ, &clear_cache, &printf_);
   // Wait for PHY reset to finish
   eth_wait_phy_rst();
 #endif // IOB_SYSTEM_LINUX_USE_ETHERNET
