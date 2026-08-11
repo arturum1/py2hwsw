@@ -9,7 +9,8 @@ set -e
 #find directories containing testbenches
 TBS=`find ${LIB_DIR} | grep _tb.v | grep -v include | grep -v submodules`
 
-FILTER_OUT_TBS=""
+# Disable iob_system_linux since it takes too long to simulate with icarus
+FILTER_OUT_TBS="iob_system_linux"
 #for debug
 #FILTER_OUT_TBS="iob_div_pipe iob_div_subshift iob_div_subshift_frac iob_ctls iob_prio_enc iob_and iob_aoi iob_csrs_demo iob_axis2ahb iob_iob_s_axi_m iob_dma iob_pulse_gen iob_fifo_async iob_fifo_sync iob_ram_2p iob_ram_at2p iob_ram_atdp iob_ram_atdp_be iob_ram_sp iob_ram_sp_be iob_ram_sp_se iob_ram_t2p iob_ram_t2p_be iob_ram_t2p_tiled iob_ram_tdp iob_ram_tdp_be iob_ram_tdp_be_xil iob_rom_2p iob_rom_atdp iob_rom_sp iob_rom_tdp iob_regarray_sp iob_shift_reg iob_system iob_system_linux iob_axistream_in iob_macc iob_timer iob_uart"
 

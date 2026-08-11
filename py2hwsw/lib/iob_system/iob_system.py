@@ -249,6 +249,14 @@ def setup(py_params: dict):
                 "type": "P",
                 "val": "0",
             },
+            {  # For iob_eth
+                "name": "FPGA_TOOL",
+                "descr": "Use IPs from fpga tool. Avaliable options: 'XILINX', 'other'.",
+                "type": "P",
+                "val": '"other"',
+                "min": "NA",
+                "max": "NA",
+            },
             #
             # False-parameters
             #
@@ -894,6 +902,7 @@ def setup(py_params: dict):
                     "is_peripheral": True,
                     "parameters": {
                         "N_CORES": 1,
+                        "FREQ": 100000000,  # FIXME: This should not be hardcoded. Should depend on board being run.
                     },
                     "connect": {
                         "clk_en_rst_s": "clk_en_rst_s",
@@ -918,6 +927,7 @@ def setup(py_params: dict):
                         "AXI_DATA_W": params["data_w"],
                         "DATA_W": params["data_w"],
                         "PHY_RST_CNT": "ETH_PHY_RST_CNT",
+                        "FPGA_TOOL": "FPGA_TOOL",
                     },
                     "connect": {
                         "clk_en_rst_s": "clk_en_rst_s",
@@ -926,6 +936,7 @@ def setup(py_params: dict):
                         "phy_rstn_o": "phy_rstn_o",
                         "mii_io": "mii_io",
                     },
+                    "plic_source_id": 2,
                 },
             ]
     attributes_dict["superblocks"] = [

@@ -110,6 +110,13 @@ def generate_dts(dts_parameters):
         bootargs = "{bootargs}";
         linux,initrd-start = <0x01000000>;
         linux,initrd-end = <0x01C00000>; // max 12MB ramdisk (rootfs) image
+        // rng-seed: 32 bytes of bootloader-supplied randomness used to seed the
+        // kernel CRNG immediately at boot (requires CONFIG_RANDOM_TRUST_BOOTLOADER).
+        // The kernel consumes and zeroes this property. NOTE: this is a fixed
+        // development seed; for production, OpenSBI/bootloader should generate a
+        // fresh seed per boot (e.g. from a hardware RNG) instead of a constant.
+        rng-seed = <0x6f1e5c8a 0x3a29d04b 0x8c72e6f9 0x4bd05c3a
+                    0x1a9f3e27 0x5c8d2b74 0xe6f0a419 0x3b75d28c>;
     }};
     soc: soc {{
         #address-cells = <1>;
@@ -119,6 +126,12 @@ def generate_dts(dts_parameters):
 
         // Peripherals added via #include statements.
         {extra_peripherals}
+        // Sys clock for Ethernet MII MDIO clock divider
+        sys_clk: clock {{
+          compatible = "fixed-clock";
+          #clock-cells = <0>;
+          clock-frequency = </*FREQ_MACRO*/>;
+        }};
     }};
 }};
 
