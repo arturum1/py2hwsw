@@ -5,8 +5,9 @@
 `timescale 1ps / 1ps
 
 module iob_clock_wizard #(
-   parameter OUTPUT_PER = 10,
-   parameter INPUT_PER  = 4
+   parameter OUTPUT_PER    = 10,
+   parameter INPUT_PER     = 4,
+   parameter CLKFBOUT_MULT = 4
 ) (  // Clock in ports
      // Clock out ports
    output clk_out1,
@@ -50,9 +51,9 @@ module iob_clock_wizard #(
       .COMPENSATION      ("AUTO"),
       .STARTUP_WAIT      ("FALSE"),
       .DIVCLK_DIVIDE     (1),
-      .CLKFBOUT_MULT     (4),
+      .CLKFBOUT_MULT     (CLKFBOUT_MULT),
       .CLKFBOUT_PHASE    (0.000),
-      .CLKOUT0_DIVIDE    (4 * OUTPUT_PER / INPUT_PER),
+      .CLKOUT0_DIVIDE    (CLKFBOUT_MULT * OUTPUT_PER / INPUT_PER),
       .CLKOUT0_PHASE     (0.000),
       .CLKOUT0_DUTY_CYCLE(0.500),
       .CLKIN_PERIOD      (INPUT_PER)

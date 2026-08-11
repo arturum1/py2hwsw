@@ -99,6 +99,7 @@ def setup(py_params: dict):
             "iob_zybo_z7",
             "iob_smart_zynq_sl",
             "iob_cyclonev_gt_dk",
+            "iob_zcu104",
         ],
         "python_parameters": python_parameters_attribute,
         "title": "IOb-System",
