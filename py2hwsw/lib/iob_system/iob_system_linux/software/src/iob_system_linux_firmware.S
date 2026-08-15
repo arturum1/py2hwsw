@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 #include "iob_system_linux_conf.h"
 #include "iob_system_linux_mmap.h"

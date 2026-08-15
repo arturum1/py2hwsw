@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 
 def setup(py_params_dict):
@@ -91,7 +91,7 @@ def setup(py_params_dict):
                 "instance_description": "2-port register array",
                 "parameters": {
                     "N": "1<<ADDR_W",
-                    "W": "DATA_W",
+                    "W": "8",
                     "WDATA_W": "DATA_W",
                     "WADDR_W": "ADDR_W",
                     "RDATA_W": "DATA_W",

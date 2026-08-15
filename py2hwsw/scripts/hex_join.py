@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Joins two hex files, one starting at address 0 and one starting at address TOTALSIZE/2
 from sys import argv

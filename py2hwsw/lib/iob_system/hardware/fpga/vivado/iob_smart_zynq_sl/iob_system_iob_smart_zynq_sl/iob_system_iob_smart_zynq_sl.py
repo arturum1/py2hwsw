@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 import os
 
@@ -28,13 +28,13 @@ def setup(py_params_dict):
                 "name": "AXI_LEN_W",
                 "descr": "AXI burst length width",
                 "type": "D",
-                "val": "8",
+                "val": "4",
                 "min": "1",
                 "max": "8",
             },
             {
                 "name": "AXI_ADDR_W",
-                "descr": "AXI address bus width. 2**29 byte-addresses for 512 MiB of DDR3 memory.",
+                "descr": "AXI address bus width. 2**29 byte-addresses for 512 MiB of DDR3 memory. Note: Even though the full DDR address range for this board is [0x00000000, 0x1FFFFFFF], the PS7 HP0 interface can only access the range [0x00080000, 0x1FFFFFFF].",
                 "type": "D",
                 "val": "29",
                 "min": "1",
@@ -119,20 +119,18 @@ def setup(py_params_dict):
     if params["use_ethernet"]:
         attributes_dict["ports"] += [
             {
-                "name": "mii_io",
-                "descr": "Ethernet interface",
+                "name": "rgmii_io",
+                "descr": "Ethernet RGMII interface for PHY",
                 "signals": [
-                    {"name": "mii_rx_clk_i", "width": "1"},
-                    {"name": "mii_rxd_i", "width": "4"},
-                    {"name": "mii_rx_dv_i", "width": "1"},
-                    {"name": "mii_rx_er_i", "width": "1"},
-                    {"name": "mii_tx_clk_o", "width": "1"},
-                    {"name": "mii_txd_o", "width": "4"},
-                    {"name": "mii_tx_en_o", "width": "1"},
-                    {"name": "mii_mdc_o", "width": "1"},
-                    {"name": "mii_mdio_io", "width": "1"},
-                    {"name": "mii_crs_i", "width": "1"},
-                    {"name": "mii_col_i", "width": "1"},
+                    {"name": "rgmii_rx_clk_i", "width": "1"},
+                    {"name": "rgmii_rxd_i", "width": "4"},
+                    {"name": "rgmii_rx_dv_i", "width": "1"},
+                    {"name": "rgmii_rx_er_i", "width": "1"},
+                    {"name": "rgmii_tx_clk_o", "width": "1"},
+                    {"name": "rgmii_txd_o", "width": "4"},
+                    {"name": "rgmii_tx_en_o", "width": "1"},
+                    {"name": "rgmii_mdc_o", "width": "1"},
+                    {"name": "rgmii_mdio_io", "width": "1"},
                 ],
             },
         ]
@@ -167,13 +165,13 @@ def setup(py_params_dict):
         },
         {
             "name": "axi",
-            "descr": "AXI interface to connect SoC to PS DDR",
+            "descr": "AXI interface to connect Address Translator to PS7 DDR",
             "signals": {
                 "type": "axi",
                 "ID_W": "AXI_ID_W",
                 "ADDR_W": "AXI_ADDR_W",
                 "DATA_W": "AXI_DATA_W",
-                "LEN_W": "AXI_LEN_W",
+                "LEN_W": 8,
                 "PROT_W": 3,
                 "LOCK_W": 1,
             },
@@ -187,13 +185,30 @@ def setup(py_params_dict):
             },
         },
     ]
+    if params["use_extmem"]:
+        attributes_dict["wires"] += [
+            {
+                "name": "soc_axi",
+                "descr": "AXI interface to connect SoC to Address Translator",
+                "signals": {
+                    "type": "axi",
+                    "prefix": "soc_",
+                    "ID_W": "AXI_ID_W",
+                    "ADDR_W": "AXI_ADDR_W",
+                    "DATA_W": "AXI_DATA_W",
+                    "LEN_W": 8,
+                    "PROT_W": 3,
+                    "LOCK_W": 1,
+                },
+            },
+        ]
     if params["use_ethernet"]:
         attributes_dict["wires"] += [
             {
                 "name": "rxclk_buf_io",
                 "descr": "IBUFG io",
                 "signals": [
-                    {"name": "mii_rx_clk_i"},
+                    {"name": "rgmii_rx_clk_i"},
                     {"name": "eth_clk", "width": "1"},
                 ],
             },
@@ -204,7 +219,7 @@ def setup(py_params_dict):
                     {"name": "eth_clk"},
                     {"name": "high", "width": "1"},
                     {"name": "low", "width": "1"},
-                    {"name": "mii_tx_clk_o"},
+                    {"name": "rgmii_tx_clk_o"},
                 ],
             },
             {
@@ -220,11 +235,23 @@ def setup(py_params_dict):
             },
             {
                 "name": "mii",
-                "descr": "Ethernet MII interface for UUT",
-                "signals": {
-                    "type": "mii",
-                    "prefix": "uut_",
-                },
+                "descr": "Ethernet MII interface",
+                "signals": [
+                    {"name": "uut_mii_tx_clk", "width": "1"},
+                    {"name": "uut_mii_txd", "width": "4"},
+                    {"name": "uut_mii_tx_en", "width": "1"},
+                    {"name": "uut_mii_tx_er", "width": "1"},
+                    {"name": "uut_mii_rx_clk", "width": "1"},
+                    {"name": "uut_mii_rxd", "width": "4"},
+                    {"name": "uut_mii_rx_dv", "width": "1"},
+                    {"name": "uut_mii_rx_er", "width": "1"},
+                    {"name": "uut_mii_crs", "width": "1"},
+                    {"name": "uut_mii_col", "width": "1"},
+                    {
+                        "name": "rgmii_mdio_io"
+                    },  # Don't create internal wire 'uut_mii_mdio', because we cant assign bidirectional signals in verilog. Use rgmii_mdio_io signal directly.
+                    {"name": "uut_mii_mdc", "width": "1"},
+                ],
             },
         ]
 
@@ -239,9 +266,10 @@ def setup(py_params_dict):
             "instance_description": "IOb-System instance",
             "parameters": {
                 "AXI_ID_W": "AXI_ID_W",
-                "AXI_LEN_W": "8",  # SoC expects AXI4
+                "AXI_LEN_W": "AXI_LEN_W",
                 "AXI_ADDR_W": "AXI_ADDR_W",
                 "AXI_DATA_W": "AXI_DATA_W",
+                "FPGA_TOOL": '"XILINX"',
             },
             "connect": {
                 "clk_en_rst_s": "clk_en_rst",
@@ -251,7 +279,7 @@ def setup(py_params_dict):
         },
     ]
     if params["use_extmem"]:
-        attributes_dict["subblocks"][-1]["connect"].update({"axi_m": "axi"})
+        attributes_dict["subblocks"][-1]["connect"].update({"axi_m": "soc_axi"})
     if params["use_ethernet"]:
         attributes_dict["subblocks"][-1]["connect"].update({"mii_io": "mii"})
         attributes_dict["subblocks"][-1]["connect"].update({"phy_rstn_o": "phy_rstn"})
@@ -271,6 +299,34 @@ def setup(py_params_dict):
                 },
             },
         ]
+    if params["use_extmem"]:
+        attributes_dict["subblocks"] += [
+            {
+                "core_name": "iob_address_translator",
+                "instance_name": "ps7_ddr_address_translator",
+                "instance_description": "AXI Address Translator to offset all addresses requested by SoC by 0x80000, since PS7 DDR memory can only be accessed from HP0 interface starting at 0x80000.",
+                "parameters": {
+                    "ID_W": "AXI_ID_W",
+                    "ADDR_W": "AXI_ADDR_W",
+                    "DATA_W": "AXI_DATA_W",
+                    "LEN_W": 8,
+                    "PROT_W": 3,
+                    "LOCK_W": 1,
+                },
+                "connect": {
+                    "subordinate_s": "soc_axi",
+                    "manager_m": "axi",
+                },
+                "name": "ps7_ddr_address_translator",
+                "interface": "axi",
+                "has_prot": True,
+                "memory_zones": [
+                    # (Initial zone address, Last zone address (inclusive), Offset to add (for translation))
+                    # Offset all addresses requested by SoC by 0x80000, since PS7 DDR memory can only be accessed from HP0 interface starting at 0x80000.
+                    (0x0, 0x1FFFFFFF, 0x00080000),
+                ],
+            },
+        ]
 
     #
     # Snippets
@@ -282,10 +338,21 @@ def setup(py_params_dict):
     
     // Connect clk_en_rst sources
     assign cke = 1'b1;
-    assign arst = ~rst_n;
+
+    // Delayed reset: hold arst high for ~128M clocks (~2.56s at 50 MHz) after
+    // FCLK_RESET0_N deasserts, giving the PS7 time to initialize the DDR
+    // controller before the PL starts accessing the HP0 interface.
+    reg [26:0] rst_delay;
+    always @(posedge clk) begin
+       if (!rst_n)
+          rst_delay <= 0;
+       else if (!rst_delay[26])
+          rst_delay <= rst_delay + 1;
+    end
+    assign arst = ~rst_delay[26];
 
     // Connect iob_system uart flow control
-    assign uut_rs232_cts = 1'b1;
+    assign uut_rs232_cts = 1'b0;
     // uut_rs232_rts floating
 
     // For now, UART pins can be connected to either iob_system or PS7. Select one below.
@@ -398,29 +465,34 @@ def setup(py_params_dict):
     assign axi_arvalid = 'b0;
     assign axi_rready = 'b0;
 """
+    else:
+        verilog_snippet += """
+    // Drive unused AXI protection signals to 0
+    assign soc_axi_arprot = 3'b000;
+    assign soc_axi_awprot = 3'b000;
+"""
     if params["use_ethernet"]:
         verilog_snippet += """
     // Ethernet connections
     assign high = 1'b1;
     assign low = 1'b0;
 
-    // Use mii_rx_clk_i buffered clock (eth_clk) for internal MII and external mii_tx_clk_i
+    // Use rgmii_rx_clk_i buffered clock (eth_clk) for internal MII and external rgmii_tx_clk_o
     assign uut_mii_rx_clk = eth_clk;
     assign uut_mii_tx_clk = eth_clk;
 
-    // Connect internal MII data/control to external ports
-    assign uut_mii_rxd = mii_rxd_i;
-    assign uut_mii_rx_dv = mii_rx_dv_i;
-    assign uut_mii_rx_er = mii_rx_er_i;
+    // Connect internal MII data/control to external RGMII ports
+    assign uut_mii_rxd = rgmii_rxd_i;
+    assign uut_mii_rx_dv = rgmii_rx_dv_i;
+    assign uut_mii_rx_er = rgmii_rx_er_i;
 
-    assign mii_txd_o = uut_mii_txd;
-    assign mii_tx_en_o = uut_mii_tx_en;
+    assign rgmii_txd_o = uut_mii_txd;
+    assign rgmii_tx_en_o = uut_mii_tx_en;
 
-    assign mii_mdc_o = uut_mii_mdc;
-    assign mii_mdio_io = uut_mii_mdio;
+    assign rgmii_mdc_o = uut_mii_mdc;
 
-    assign uut_mii_crs = mii_crs_i;
-    assign uut_mii_col = mii_col_i;
+    assign uut_mii_crs = 1'b0;
+    assign uut_mii_col = 1'b0;
 
     assign phy_rstn = ~arst; // PHY reset
 """
@@ -440,7 +512,7 @@ def setup(py_params_dict):
 # This file was automatically generated by the iob_system_iob_smart_zynq_sl.py script.
 
 # Clock groups
-set_clock_groups -asynchronous -group {clk_fpga_0} -group {mii_rx_clk_i}
+set_clock_groups -asynchronous -group {clk_fpga_0} -group {rgmii_rx_clk_i}
 """
         )
 

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2018 Alex Forencich
-// SPDX-FileCopyrightText: 2025 IObundle
+// SPDX-FileCopyrightText: 2026 IObundle
 //
 // SPDX-License-Identifier: MIT
 
@@ -172,12 +172,12 @@ module iob_axi_interconnect #(
    assign m_axi_ruser_i  = 'b0;
 
    // Unused prot ports
-   wire [          S_COUNT*3-1:0] s_axi_awprot_i;
-   wire [          S_COUNT*3-1:0] s_axi_arprot_i;
-   wire [           M_COUNT*3-1:0] m_axi_awprot_o;
-   wire [           M_COUNT*3-1:0] m_axi_arprot_o;
+   wire [S_COUNT*3-1:0] s_axi_awprot_i;
+   wire [S_COUNT*3-1:0] s_axi_arprot_i;
+   wire [M_COUNT*3-1:0] m_axi_awprot_o;
+   wire [M_COUNT*3-1:0] m_axi_arprot_o;
    assign s_axi_awprot_i = 'b0;
-   assign s_axi_arprot_i  = 'b0;
+   assign s_axi_arprot_i = 'b0;
 
    localparam CL_S_COUNT = $clog2(S_COUNT);
    localparam CL_M_COUNT = $clog2(M_COUNT);
@@ -545,14 +545,14 @@ module iob_axi_interconnect #(
       .BLOCK       ("ACKNOWLEDGE"),
       .LSB_PRIORITY("HIGH")
    ) arb_inst (
-      .clk          (clk_i),
-      .arst         (1'b0),
-      .rst          (rst_i),
-      .request      (request),
-      .acknowledge  (acknowledge),
-      .grant        (grant),
-      .grant_valid  (grant_valid),
-      .grant_encoded(grant_encoded)
+       .clk          (clk_i),
+       .arst         (1'b0),
+       .rst          (rst_i),
+       .request      (request),
+       .acknowledge  (acknowledge),
+       .grant        (grant),
+       .grant_valid  (grant_valid),
+       .grant_encoded(grant_encoded)
    );
 
    genvar n;

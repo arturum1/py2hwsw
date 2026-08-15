@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 
 def setup(py_params_dict):
@@ -22,6 +22,14 @@ def setup(py_params_dict):
                 "min": "1",
                 "max": "NA",
                 "descr": "",
+            },
+            {
+                "name": "CLKFBOUT_MULT",
+                "type": "P",
+                "val": "4",
+                "min": "1",
+                "max": "NA",
+                "descr": "PLL feedback multiplier. VCO = (1000/INPUT_PER) * CLKFBOUT_MULT MHz",
             },
         ],
         "ports": [
@@ -75,8 +83,9 @@ def setup(py_params_dict):
         {
             "verilog_code": """
     iob_clock_wizard #(
-        .OUTPUT_PER(OUTPUT_PER),
-        .INPUT_PER (INPUT_PER)
+        .OUTPUT_PER   (OUTPUT_PER),
+        .INPUT_PER    (INPUT_PER),
+        .CLKFBOUT_MULT(CLKFBOUT_MULT)
     ) clock_wizard_inst (
         .clk_in1_p(clk_p_i),
         .clk_in1_n(clk_n_i),

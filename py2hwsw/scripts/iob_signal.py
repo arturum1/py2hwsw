@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 from dataclasses import dataclass, field
 import copy
@@ -25,6 +25,8 @@ class iob_signal:
     isreg: bool = False
     # Used for `iob_comb`: List of signals associated to the infered register.
     reg_signals: list[str] = field(default_factory=list)
+    # Used for `iob_comb`: Reset value for infered register.
+    rst_val: str = ""
 
     # Logic value for future simulation effort using global signals list.
     # See 'TODO' in iob_core.py for more info: https://github.com/IObundle/py2hwsw/blob/a1e2e2ee12ca6e6ad81cc2f8f0f1c1d585aaee73/py2hwsw/scripts/iob_core.py#L251-L259

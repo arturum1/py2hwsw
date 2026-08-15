@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # This file is copied to the root of the build directory and becomes the top Makefile.
 
@@ -118,6 +118,12 @@ fpga-debug:
 	echo "BOARD=$(BOARD)"
 	make -C $(FPGA_DIR) debug
 
+fpga-gui:
+	make -C $(FPGA_DIR) gui BOARD=$(BOARD) USE_FPGA=$(USE_FPGA)
+
+fpga-debug-ila:
+	make -C $(FPGA_DIR) debug-ila BOARD=$(BOARD) USE_FPGA=$(USE_FPGA)
+
 fpga-clean:
 	if [ -f "$(FPGA_DIR)/Makefile" ]; then make -C $(FPGA_DIR) clean; fi
 
@@ -178,7 +184,7 @@ clean: sw-clean pc-emul-clean lint-clean sim-clean fpga-clean syn-clean doc-clea
 	pc-emul-build pc-emul-run pc-emul-clean \
 	lint-test lint-run lint-clean \
 	sim-build sim-run sim-debug sim-clean \
-	fpga-build fpga-debug fpga-clean \
+	fpga-build fpga-debug fpga-gui fpga-clean \
 	doc-build doc-view doc-debug doc-test doc-clean \
 	test clean debug
 

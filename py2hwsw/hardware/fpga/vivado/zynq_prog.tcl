@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Zynq Programming Script for XSCT
 set FPGA_TOP [lindex $argv 0]
@@ -16,7 +16,7 @@ rst -system
 after 1000
 
 # 2. Program the PL
-targets -set -nocase -filter {name =~ "xc7z020"}
+targets -set -nocase -filter {name =~ "xc7z*"}
 puts "--- Programming PL ---"
 fpga "$FPGA_TOP.bit"
 

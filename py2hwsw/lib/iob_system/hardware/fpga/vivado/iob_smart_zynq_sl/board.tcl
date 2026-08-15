@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 set PART xc7z020clg484-1
 
@@ -71,6 +71,12 @@ if { [get_files system.bd] == "" } {
     generate_target all [get_files system.bd]
     set wrapper_path [make_wrapper -files [get_files system.bd] -top]
     read_verilog $wrapper_path
+}
+
+if { $USE_EXTMEM > 0 } {
+    if {[file exists "vivado/$BOARD/ps7_ddr_address_translator.v"]} {
+        read_verilog vivado/$BOARD/ps7_ddr_address_translator.v
+    }
 }
 
 if { $USE_ETHERNET > 0 } {

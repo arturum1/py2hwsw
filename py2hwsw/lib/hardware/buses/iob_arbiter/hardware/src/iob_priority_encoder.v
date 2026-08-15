@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2014-2018 Alex Forencich
-// SPDX-FileCopyrightText: 2025 IObundle
+// SPDX-FileCopyrightText: 2026 IObundle
 //
 // SPDX-License-Identifier: MIT
 
@@ -46,25 +46,25 @@ module iob_priority_encoder #(
          wire [W2-1:0] in2;
          assign in2[WIDTH-W2-1:0] = input_unencoded[WIDTH-1:W2];
          if (WIDTH - W2 < W2) begin : g_pad_in2
-             assign in2[W2-1:WIDTH-W2] = 0;
+            assign in2[W2-1:WIDTH-W2] = 0;
          end
          iob_priority_encoder #(
             .WIDTH       (W2),
             .LSB_PRIORITY(LSB_PRIORITY)
          ) iob_priority_encoder_inst1 (
-            .input_unencoded (input_unencoded[W2-1:0]),
-            .output_valid    (valid1),
-            .output_encoded  (out1),
-            .output_unencoded()
+             .input_unencoded (input_unencoded[W2-1:0]),
+             .output_valid    (valid1),
+             .output_encoded  (out1),
+             .output_unencoded()
          );
          iob_priority_encoder #(
             .WIDTH       (W2),
             .LSB_PRIORITY(LSB_PRIORITY)
          ) iob_priority_encoder_inst2 (
-            .input_unencoded (in2),
-            .output_valid    (valid2),
-            .output_encoded  (out2),
-            .output_unencoded()
+             .input_unencoded (in2),
+             .output_valid    (valid2),
+             .output_encoded  (out2),
+             .output_unencoded()
          );
          // multiplexer to select part
          assign output_valid = valid1 | valid2;

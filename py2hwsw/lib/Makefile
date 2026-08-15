@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # (c) 2022-Present IObundle, Lda, all rights reserved
 #
@@ -201,6 +201,20 @@ ifneq ($(SOC_LINUX_BUILD_DIR),)
 endif
 
 .PHONY: buildroot-update
+
+linux-kernel:
+	# Copy defconfig (linux_config) from iob_system_linux to iob_linux
+	cp iob_system/iob_system_linux/software/linux_config $(LINUX_SUBMODULE_DIR)/software/linux_config
+	# Run target to create linux directory (so that we can modify its sources)
+	nix-shell $(LINUX_SUBMODULE_DIR) --run 'make -C $(LINUX_SUBMODULE_DIR) clean-linux-kernel $(CURDIR)/$(LINUX_SUBMODULE_DIR)/submodules/linux-5.15.98'
+	# Copy custom ethoc driver to kernel source folder
+	cp iob_system/submodules/iob_eth/software/linux/ethoc.c $(LINUX_SUBMODULE_DIR)/submodules/linux-5.15.98/drivers/net/ethernet/ethoc.c
+	# Build Linux kernel
+	nix-shell $(LINUX_SUBMODULE_DIR) --run 'make -C $(LINUX_SUBMODULE_DIR) build-linux-kernel'
+	# Copy built Linux kernel to iob_system_linux
+	cp $(LINUX_SUBMODULE_DIR)/software/OS_build/Image iob_system/iob_system_linux/software/src/Image
+
+.PHONY: linux-kernel
 
 # Find board directoy in py2hwsw/hardware/fpga
 BOARD_DIR := $(shell find ../hardware/fpga -name $(BOARD) -type d -print -quit)

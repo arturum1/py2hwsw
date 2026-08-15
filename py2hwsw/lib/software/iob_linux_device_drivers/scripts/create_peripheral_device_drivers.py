@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 import os
 import string
@@ -10,7 +10,7 @@ from math import ceil
 from create_peripheral_tests import create_peripheral_tests
 from create_device_tree_files import create_device_tree_files
 from create_driver_documentation import create_driver_documentation
-from linux_utils import csr_type
+from linux_utils import csr_type, evaluate_peripheral_csrs_widths
 
 SPDX_PREFIX = "SPDX-"
 
@@ -141,7 +141,7 @@ def create_dev_user_csrs_source(path, peripheral):
 """
         + """\
 
-uint32_t read_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t *value) {
+static uint32_t read_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t *value) {
   ssize_t ret = -1;
 
   if (fd == 0) {
@@ -192,7 +192,7 @@ uint32_t read_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t *value) {
   return ret;
 }
 
-uint32_t write_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t value) {
+static uint32_t write_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t value) {
   ssize_t ret = -1;
 
   if (fd == 0) {
@@ -237,7 +237,7 @@ uint32_t write_reg(int fd, uint32_t addr, uint32_t nbits, uint32_t value) {
 
 """
         + f"""\
-int fd = 0;
+static int fd = 0;
 
 void {peripheral['name']}_csrs_init_baseaddr(uint32_t addr) {{
   fd = open({peripheral['upper_name']}_DEVICE_FILE, O_RDWR);
@@ -312,7 +312,7 @@ def create_ioctl_user_csrs_source(path, peripheral):
     )
 
     content += f"""\
-int fd = 0;
+static int fd = 0;
 
 void {peripheral['name']}_csrs_init_baseaddr(uint32_t addr) {{
   fd = open({peripheral['upper_name']}_DEVICE_FILE, O_RDWR);
@@ -972,7 +972,7 @@ static ssize_t {peripheral['name']}_read(struct file *file, char __user *buf, si
     break;
 """
 
-    if peripheral.get("support_interrupt", False):
+    if peripheral["support_interrupt"]:
         content += f"""\
   case {peripheral['upper_name']}_INTERRUPT_ADDR:
     {peripheral['name']}_irq_received = 0;
@@ -1055,10 +1055,20 @@ static loff_t {peripheral['name']}_llseek(struct file *filp, loff_t offset, int 
   default:
     return -EINVAL;
   }}
+"""
 
+    if peripheral["support_interrupt"]:
+        content += f"""\
   // Check for valid bounds
   if (new_pos < 0 || (new_pos > {peripheral['name']}_data.regsize && 
                      new_pos != {peripheral['upper_name']}_INTERRUPT_ADDR)) {{
+"""
+    else:
+        content += f"""\
+  // Check for valid bounds
+  if (new_pos < 0 || new_pos > {peripheral['name']}_data.regsize) {{
+"""
+    content += f"""\
     return -EINVAL;
   }}
 
@@ -1140,23 +1150,43 @@ def create_user_makefile(path, peripheral):
 #
 # {SPDX_PREFIX}License-Identifier: {peripheral['spdx_license']}
 
+# Default to dynamic linking for small size. 
+# Use 'make STATIC=1' for a (larger) standalone binary, with entire C standard library (libc) embedded into it.
+# To use STATIC=0, the following requirements apply:
+# - Shared Libraries: Your SoC's Linux system must have the libc.so (C standard library) installed in /lib or /usr/lib.
+# - ABI Match: The libc on your SoC must match the one used during compilation (e.g., if you compile with glibc, the SoC needs glibc).
+# - Dynamic Linker: The dynamic linker (e.g., /lib/ld-linux-riscv32...) must be present on the SoC.
+STATIC ?= 0
+
 # Select kernel-userspace interface: sysfs; dev; ioctl
 IF ?= sysfs
 UPPER_IF = $(shell echo $(IF) | tr '[:lower:]' '[:upper:]')
+
+BIN = {peripheral['name']}_user
+
 SRC = $(BIN).c {peripheral['name']}_$(IF)_csrs.c
 SRC += $(wildcard ../../src/{peripheral['name']}.c)
 HDR += ../drivers/{peripheral['name']}_driver_files.h
+
+CC = riscv64-unknown-linux-gnu-gcc
+# Strip debug symbols to make binary smaller
+STRIP = riscv64-unknown-linux-gnu-strip
+
+
+# Use -Os for smaller size, or -O2 for best performance
 FLAGS = -Wall -Werror -O2
-FLAGS += -static
 FLAGS += -march=rv32imac
 FLAGS += -mabi=ilp32
 FLAGS += -I../drivers -I../../src
 FLAGS += -D$(UPPER_IF)_IF
-BIN = {peripheral['name']}_user
-CC = riscv64-unknown-linux-gnu-gcc
+
+ifeq ($(STATIC), 1)
+	FLAGS += -static
+endif
 
 $(BIN)_$(IF): $(SRC) $(HDR)
 	$(CC) $(FLAGS) $(INCLUDE) -o $(BIN)_$(IF) $(SRC)
+	$(STRIP) --strip-unneeded $(BIN)_$(IF)
 
 all:
 	make IF=sysfs
@@ -1244,6 +1274,7 @@ def generate_device_drivers(
         "spdx_year": license_year,
         "spdx_license": license_name,
         "license": f"Dual {license_name}/GPL",
+        "confs": peripheral.get("confs", []),  # Used to eval parameters on CSRs
         "csrs": csrs_list,
         "support_interrupt": support_interrupt,
         "compatible_str": (
@@ -1269,9 +1300,18 @@ def generate_device_drivers(
         os.path.join(drivers_output_dir, "drivers"), _peripheral
     )
     create_driver_main_file(os.path.join(drivers_output_dir, "drivers"), _peripheral)
-    create_sysfs_user_csrs_source(os.path.join(drivers_output_dir, "user"), _peripheral)
-    create_dev_user_csrs_source(os.path.join(drivers_output_dir, "user"), _peripheral)
-    create_ioctl_user_csrs_source(os.path.join(drivers_output_dir, "user"), _peripheral)
+
+    _evaluated_peripheral = evaluate_peripheral_csrs_widths(_peripheral)
+    create_sysfs_user_csrs_source(
+        os.path.join(drivers_output_dir, "user"), _evaluated_peripheral
+    )
+    create_dev_user_csrs_source(
+        os.path.join(drivers_output_dir, "user"), _evaluated_peripheral
+    )
+    create_ioctl_user_csrs_source(
+        os.path.join(drivers_output_dir, "user"), _evaluated_peripheral
+    )
+
     create_user_makefile(os.path.join(drivers_output_dir, "user"), _peripheral)
     create_peripheral_tests(os.path.join(drivers_output_dir, "user"), _peripheral)
     create_device_tree_files(drivers_output_dir, _peripheral, dts_extra_properties)

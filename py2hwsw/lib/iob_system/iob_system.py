@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 import sys
 import os
@@ -27,6 +27,14 @@ def setup(py_params: dict):
         "use_ethernet": (
             False,
             "If should include ethernet peripheral, MII interface, and testbenches with ethernet support.",
+        ),
+        "use_plic": (
+            True,
+            "If should instantiate the PLIC peripheral and wire its outputs (meip/seip) to the CPU's interrupt_i port. Set to False for CPUs with no external-interrupt input wired.",
+        ),
+        "use_clint": (
+            True,
+            "If should instantiate the CLINT peripheral and wire its outputs (msip/mtip, mtime) to the CPU's interrupt_i/timebase_i ports. Set to False for CPUs with no timer/software-interrupt input wired.",
         ),
         "addr_w": (32, "CPU address width"),
         "data_w": (32, "CPU data width"),
@@ -91,6 +99,7 @@ def setup(py_params: dict):
             "iob_zybo_z7",
             "iob_smart_zynq_sl",
             "iob_cyclonev_gt_dk",
+            "iob_zcu104",
         ],
         "python_parameters": python_parameters_attribute,
         "title": "IOb-System",
@@ -239,6 +248,14 @@ def setup(py_params: dict):
                 "descr": "Enable simulation optimizations. For example, lower ethernet PHY_RST_CNT value.",
                 "type": "P",
                 "val": "0",
+            },
+            {  # For iob_eth
+                "name": "FPGA_TOOL",
+                "descr": "Use IPs from fpga tool. Avaliable options: 'XILINX', 'other'.",
+                "type": "P",
+                "val": '"other"',
+                "min": "NA",
+                "max": "NA",
             },
             #
             # False-parameters
@@ -560,35 +577,41 @@ def setup(py_params: dict):
                 },
             },
             # Peripheral cbus wires added automatically
-            {
-                "name": "plic_interrupts",
-                "descr": "Connect PLIC interrupts to CPU",
-                "signals": [
-                    {"name": "riscv_meip"},
-                    {"name": "riscv_seip"},
-                ],
-            },
-            {
-                "name": "clint_rt_clk",
-                "descr": "CLINT real time clock",
-                "signals": [
-                    {
-                        "name": "rt_clk",
-                        "descr": "Real Time clock input if available (usually 32.768 kHz)",
-                        "width": "1",
-                    },
-                ],
-            },
-            {
-                "name": "clint_interrupts",
-                "descr": "Connect CLINT interrupts to CPU",
-                "signals": [
-                    {"name": "riscv_mtip"},
-                    {"name": "riscv_msip"},
-                ],
-            },
             # NOTE: Add other peripheral wires here
         ]
+        if params["use_plic"]:
+            attributes_dict["wires"] += [
+                {
+                    "name": "plic_interrupts",
+                    "descr": "Connect PLIC interrupts to CPU",
+                    "signals": [
+                        {"name": "riscv_meip"},
+                        {"name": "riscv_seip"},
+                    ],
+                },
+            ]
+        if params["use_clint"]:
+            attributes_dict["wires"] += [
+                {
+                    "name": "clint_rt_clk",
+                    "descr": "CLINT real time clock",
+                    "signals": [
+                        {
+                            "name": "rt_clk",
+                            "descr": "Real Time clock input if available (usually 32.768 kHz)",
+                            "width": "1",
+                        },
+                    ],
+                },
+                {
+                    "name": "clint_interrupts",
+                    "descr": "Connect CLINT interrupts to CPU",
+                    "signals": [
+                        {"name": "riscv_mtip"},
+                        {"name": "riscv_msip"},
+                    ],
+                },
+            ]
         if params["use_ethernet"]:
             attributes_dict["wires"] += [
                 {
@@ -853,36 +876,43 @@ def setup(py_params: dict):
                 },
                 "plic_source_id": 1,
             },
-            {
-                "core_name": "iob_plic",
-                "instance_name": "PLIC0",
-                "instance_description": "RISC-V PLIC peripheral",
-                "is_peripheral": True,
-                "connect": {
-                    "clk_en_rst_s": "clk_en_rst_s",
-                    # Cbus connected automatically
-                    "interrupt_i": "interrupts",
-                    "interrupt_o": "plic_interrupts",
-                },
-            },
-            {
-                "core_name": "iob_clint",
-                "instance_name": "CLINT0",
-                "instance_description": "RISC-V CLINT peripheral",
-                "is_peripheral": True,
-                "parameters": {
-                    "N_CORES": 1,
-                },
-                "connect": {
-                    "clk_en_rst_s": "clk_en_rst_s",
-                    # Cbus connected automatically
-                    "rt_clk_i": "clint_rt_clk",
-                    "interrupt_o": "clint_interrupts",
-                    "timebase_o": "riscv_timebase",
-                },
-            },
             # NOTE: Instantiate other peripherals here, using the 'is_peripheral' flag
         ]
+        if params["use_plic"]:
+            attributes_dict["subblocks"] += [
+                {
+                    "core_name": "iob_plic",
+                    "instance_name": "PLIC0",
+                    "instance_description": "RISC-V PLIC peripheral",
+                    "is_peripheral": True,
+                    "connect": {
+                        "clk_en_rst_s": "clk_en_rst_s",
+                        # Cbus connected automatically
+                        "interrupt_i": "interrupts",
+                        "interrupt_o": "plic_interrupts",
+                    },
+                },
+            ]
+        if params["use_clint"]:
+            attributes_dict["subblocks"] += [
+                {
+                    "core_name": "iob_clint",
+                    "instance_name": "CLINT0",
+                    "instance_description": "RISC-V CLINT peripheral",
+                    "is_peripheral": True,
+                    "parameters": {
+                        "N_CORES": 1,
+                        "FREQ": 100000000,  # FIXME: This should not be hardcoded. Should depend on board being run.
+                    },
+                    "connect": {
+                        "clk_en_rst_s": "clk_en_rst_s",
+                        # Cbus connected automatically
+                        "rt_clk_i": "clint_rt_clk",
+                        "interrupt_o": "clint_interrupts",
+                        "timebase_o": "riscv_timebase",
+                    },
+                },
+            ]
         if params["use_ethernet"]:
             attributes_dict["subblocks"] += [
                 {
@@ -897,6 +927,7 @@ def setup(py_params: dict):
                         "AXI_DATA_W": params["data_w"],
                         "DATA_W": params["data_w"],
                         "PHY_RST_CNT": "ETH_PHY_RST_CNT",
+                        "FPGA_TOOL": "FPGA_TOOL",
                     },
                     "connect": {
                         "clk_en_rst_s": "clk_en_rst_s",
@@ -905,6 +936,7 @@ def setup(py_params: dict):
                         "phy_rstn_o": "phy_rstn_o",
                         "mii_io": "mii_io",
                     },
+                    "plic_source_id": 2,
                 },
             ]
     attributes_dict["superblocks"] = [
@@ -967,6 +999,28 @@ def setup(py_params: dict):
 """
             }
         ]
+
+    # The CPU's interrupt_i/timebase_i ports are always connected to the
+    # riscv_interrupts/riscv_timebase composite wires. When PLIC or CLINT is
+    # disabled, the signals that peripheral used to drive are left floating, so
+    # tie them off to 0 here.
+    if (
+        params["cpu"] != "none"
+        and params["use_peripherals"]
+        and params["include_snippet"]
+    ):
+        tie_off_code = ""
+        if not params["use_plic"]:
+            tie_off_code += """
+   assign riscv_meip = 1'b0;
+   assign riscv_seip = 1'b0;"""
+        if not params["use_clint"]:
+            tie_off_code += """
+   assign riscv_mtip = 1'b0;
+   assign riscv_msip = 1'b0;
+   assign riscv_mtime = 64'b0;"""
+        if tie_off_code:
+            attributes_dict["snippets"] += [{"verilog_code": tie_off_code + "\n"}]
 
     iob_system_scripts(attributes_dict, params, py_params)
 

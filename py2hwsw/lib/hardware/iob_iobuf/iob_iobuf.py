@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 
 def setup(py_params_dict):
@@ -11,7 +11,7 @@ def setup(py_params_dict):
                 "name": "FPGA_TOOL",
                 "descr": "Use IPs from fpga tool. Avaliable options: 'XILINX', 'other'.",
                 "type": "P",
-                "val": '"XILINX"',
+                "val": '"other"',
                 "min": "NA",
                 "max": "NA",
             },
@@ -89,10 +89,13 @@ def setup(py_params_dict):
             .IO(io_io)
          );
       end else begin : tool_other
-         reg o_var;
+
          assign io_io = t_i ? 1'bz : i_i;
-         always @* o_var = #1 io_io;
-         assign o_int = o_var;
+
+         // Buffer gate primitive to add inertial delay. Models physical pad propagation
+         // time and prevents infinite zero-delay combinational feedback loops in
+         // event-driven simulators. Ignored by synthesis tools.
+         buf #1 u_pad_delay (o_int, io_io);
       end
    endgenerate
 

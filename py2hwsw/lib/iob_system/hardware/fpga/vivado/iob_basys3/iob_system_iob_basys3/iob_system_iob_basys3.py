@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 
 def setup(py_params_dict):
@@ -100,7 +100,7 @@ def setup(py_params_dict):
                 {"name": "rxd_i"},
                 {"name": "txd_o"},
                 {"name": "rs232_rts", "width": "1"},
-                {"name": "high", "width": "1"},
+                {"name": "low", "width": "1"},
             ],
         },
         {
@@ -143,6 +143,7 @@ def setup(py_params_dict):
                 "AXI_LEN_W": "AXI_LEN_W",
                 "AXI_ADDR_W": "AXI_ADDR_W",
                 "AXI_DATA_W": "AXI_DATA_W",
+                "FPGA_TOOL": '"XILINX"',
             },
             "connect": {
                 "clk_en_rst_s": "clk_en_rst",
@@ -184,6 +185,17 @@ def setup(py_params_dict):
                 "rst_i": "arst",
                 "axi_s": "memory_axi",
             },
+        },
+    ]
+    #
+    # Snippets
+    #
+    attributes_dict["snippets"] = [
+        {
+            "verilog_code": """
+    // General connections
+    assign low = 1'b0;
+""",
         },
     ]
 

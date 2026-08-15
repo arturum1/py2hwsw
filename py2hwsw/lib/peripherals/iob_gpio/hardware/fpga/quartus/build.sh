@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 export ALTERAPATH=/home/iobundle/Intel/Altera_full/18.0
 export LM_LICENSE_FILE=1801@localhost:$ALTERAPATH/../1-MVXX5H_License.dat

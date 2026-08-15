@@ -1,7 +1,7 @@
 /*
- * SPDX-FileCopyrightText: 2025 IObundle
+ * SPDX-FileCopyrightText: 2026 IObundle
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 class iob_driver extends uvm_driver #(iob_transaction);

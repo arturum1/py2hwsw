@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 
 def setup(py_params_dict):
@@ -105,8 +105,8 @@ def setup(py_params_dict):
                 },
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
-                    "counter_rst_i": "ctr_reset",
-                    "counter_en_i": "ctr_enable",
+                    "rst_i": "ctr_reset",
+                    "en_i": "ctr_enable",
                     "data_o": "addr_o",
                 },
             },

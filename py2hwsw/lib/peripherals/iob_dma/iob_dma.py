@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 
 def setup(py_params_dict):
@@ -93,7 +93,7 @@ def setup(py_params_dict):
             # AXIS Interfaces - without last
             {
                 "name": "dma_input_io",
-                "descr": "",
+                "descr": "Input AXIS interface",
                 "signals": [
                     {"name": "axis_in_tdata_i", "width": "AXI_DATA_W"},
                     {"name": "axis_in_tvalid_i", "width": "1"},
@@ -102,7 +102,7 @@ def setup(py_params_dict):
             },
             {
                 "name": "dma_output_io",
-                "descr": "",
+                "descr": "Output AXIS interface",
                 "signals": [
                     {"name": "axis_out_tdata_o", "width": "AXI_DATA_W"},
                     {"name": "axis_out_tvalid_o", "width": "1"},
@@ -112,6 +112,7 @@ def setup(py_params_dict):
             # AXI Interface
             {
                 "name": "axi_m",
+                "descr": "AXI interface",
                 "signals": {
                     "type": "axi",
                     "ID_W": "AXI_ID_W",
@@ -119,10 +120,52 @@ def setup(py_params_dict):
                     "DATA_W": "AXI_DATA_W",
                     "LEN_W": "AXI_LEN_W",
                 },
-                "descr": "AXI interface",
             },
         ],
         "wires": [
+            {
+                "name": "internal_axi_m",
+                "descr": "Same signals as axi_m port, but this group includes AXI 'prot' signals (required by iob_axi_m submodule)",
+                "signals": [
+                    {"name": "axi_araddr_o"},
+                    {"name": "internal_axi_arprot_o", "width": "3"},
+                    {"name": "axi_arvalid_o"},
+                    {"name": "axi_arready_i"},
+                    {"name": "axi_rdata_i"},
+                    {"name": "axi_rresp_i"},
+                    {"name": "axi_rvalid_i"},
+                    {"name": "axi_rready_o"},
+                    {"name": "axi_arid_o"},
+                    {"name": "axi_arlen_o"},
+                    {"name": "axi_arsize_o"},
+                    {"name": "axi_arburst_o"},
+                    {"name": "axi_arlock_o"},
+                    {"name": "axi_arcache_o"},
+                    {"name": "axi_arqos_o"},
+                    {"name": "axi_rid_i"},
+                    {"name": "axi_rlast_i"},
+                    {"name": "axi_awaddr_o"},
+                    {"name": "internal_axi_awprot_o", "width": "3"},
+                    {"name": "axi_awvalid_o"},
+                    {"name": "axi_awready_i"},
+                    {"name": "axi_wdata_o"},
+                    {"name": "axi_wstrb_o"},
+                    {"name": "axi_wvalid_o"},
+                    {"name": "axi_wready_i"},
+                    {"name": "axi_bresp_i"},
+                    {"name": "axi_bvalid_i"},
+                    {"name": "axi_bready_o"},
+                    {"name": "axi_awid_o"},
+                    {"name": "axi_awlen_o"},
+                    {"name": "axi_awsize_o"},
+                    {"name": "axi_awburst_o"},
+                    {"name": "axi_awlock_o"},
+                    {"name": "axi_awcache_o"},
+                    {"name": "axi_awqos_o"},
+                    {"name": "axi_wlast_o"},
+                    {"name": "axi_bid_i"},
+                ],
+            },
             {
                 "name": "receive_enabled",
                 "descr": "",
@@ -184,7 +227,8 @@ def setup(py_params_dict):
                     {"name": "w_addr_wr", "width": "AXI_ADDR_W"},
                     {"name": "w_length_wdata_reg"},
                     {"name": "w_start_wen_wr", "width": 1},
-                    {"name": "w_burstlen_wr", "width": "(AXI_LEN_W+1)"},
+                    {"name": "w_burstlen_wr", "width": "AXI_LEN_W"},
+                    {"name": "w_bursttype_wr", "width": 2},
                     {"name": "w_buf_level_rd", "width": "WLEN_W"},
                     {"name": "w_busy_rd", "width": 1},
                 ],
@@ -196,7 +240,8 @@ def setup(py_params_dict):
                     {"name": "r_addr_wr", "width": "AXI_ADDR_W"},
                     {"name": "r_length_wr", "width": "WLEN_W"},
                     {"name": "r_start_wen_wr", "width": 1},
-                    {"name": "r_burstlen_wr", "width": "(AXI_LEN_W+1)"},
+                    {"name": "r_burstlen_wr", "width": "AXI_LEN_W"},
+                    {"name": "r_bursttype_wr", "width": 2},
                     {"name": "r_buf_level_rd", "width": "WLEN_W"},
                     {"name": "r_busy_rd", "width": 1},
                 ],
@@ -236,7 +281,7 @@ def setup(py_params_dict):
                 "signals": [
                     {"name": "w_length_valid_wr", "width": 1},
                     {"name": "w_length_wdata_wr"},
-                    {"name": "w_length_wstrb_wr", "width": "WLEN_W/8"},  # Unused
+                    {"name": "w_length_wstrb_wr", "width": "WLEN_W/8"},
                     {"name": "w_length_ready_wr", "width": 1},
                 ],
             },
@@ -253,7 +298,7 @@ def setup(py_params_dict):
                 "signals": [
                     {"name": "w_start_valid_wr", "width": 1},
                     {"name": "w_start_wdata_wr", "width": 1},
-                    {"name": "w_start_wstrb_wr", "width": 1},  # Unused
+                    {"name": "w_start_wstrb_wr", "width": 1},
                     {"name": "w_start_ready_wr", "width": 1},
                 ],
             },
@@ -298,7 +343,7 @@ def setup(py_params_dict):
                 "signals": [
                     {"name": "r_start_valid_wr", "width": 1},
                     {"name": "r_start_wdata_wr", "width": 1},
-                    {"name": "r_start_wstrb_wr", "width": 1},  # Unused
+                    {"name": "r_start_wstrb_wr", "width": 1},
                     {"name": "r_start_ready_wr", "width": 1},
                 ],
             },
@@ -372,7 +417,7 @@ def setup(py_params_dict):
                             {
                                 "name": "w_burstlen",
                                 "mode": "W",
-                                "n_bits": "(AXI_LEN_W+1)",
+                                "n_bits": "AXI_LEN_W",
                                 "rst_val": 16,
                                 "log2n_items": 0,
                                 "descr": "AXI burst length for DMA write operations.",
@@ -427,7 +472,7 @@ def setup(py_params_dict):
                             {
                                 "name": "r_burstlen",
                                 "mode": "W",
-                                "n_bits": "(AXI_LEN_W+1)",
+                                "n_bits": "AXI_LEN_W",
                                 "rst_val": 16,
                                 "log2n_items": 0,
                                 "descr": "AXI burst length for DMA read operations.",
@@ -485,13 +530,13 @@ def setup(py_params_dict):
                 },
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
-                    "counter_rst_i": "w_length_wen_wr",
-                    "counter_en_i": "counter_en",
+                    "rst_i": "w_length_wen_wr",
+                    "en_i": "counter_en",
                     "data_o": "axis_in_cnt",
                 },
             },
             {
-                "core_name": "iob_axis_s_axi_m",
+                "core_name": "iob_axi_m",
                 "instance_name": "axis_s_axi_m_inst",
                 "instance_description": "AXIS to AXI",
                 "parameters": {
@@ -499,8 +544,9 @@ def setup(py_params_dict):
                     "AXI_LEN_W": "AXI_LEN_W",
                     "AXI_DATA_W": "AXI_DATA_W",
                     "AXI_ID_W": "AXI_ID_W",
-                    "WLEN_W": "WLEN_W",
-                    "RLEN_W": "RLEN_W",
+                    "WLENGTH_W": "WLEN_W",
+                    "RLENGTH_W": "RLEN_W",
+                    "FIFO_ADDR_W": "AXI_LEN_W",
                 },
                 "connect": {
                     "clk_en_rst_s": "clk_en_rst_s",
@@ -511,7 +557,7 @@ def setup(py_params_dict):
                     "axis_out_io": "dma_output_io",
                     "write_ext_mem_m": "write_ext_mem",
                     "read_ext_mem_m": "read_ext_mem",
-                    "axi_m": "axi_m",
+                    "axi_m": "internal_axi_m",  # iob_axi_m module expects AXI prot signals
                 },
             },
             {
@@ -547,6 +593,11 @@ def setup(py_params_dict):
                 "csr_if": CSR_IF,
             },
         ],
+        "sw_modules": [
+            {
+                "core_name": "iob_linux_device_drivers",
+            },
+        ],
         "snippets": [
             {
                 "verilog_code": """
@@ -559,9 +610,12 @@ def setup(py_params_dict):
     assign w_start_ready_wr = 1'b1;
     assign r_start_ready_wr = 1'b1;
 
-    assign w_length_wen_wr = w_length_valid_wr & w_length_ready_wr;
-    assign w_start_wen_wr = w_start_valid_wr & w_start_ready_wr;
-    assign r_start_wen_wr = r_start_valid_wr & r_start_ready_wr;
+    assign w_length_wen_wr = w_length_valid_wr & |w_length_wstrb_wr & w_length_ready_wr;
+    assign w_start_wen_wr = w_start_valid_wr & |w_start_wstrb_wr & w_start_ready_wr;
+    assign r_start_wen_wr = r_start_valid_wr & |r_start_wstrb_wr & r_start_ready_wr;
+
+    assign w_bursttype_wr = 2'b01;
+    assign r_bursttype_wr = 2'b01;
 """,
             },
         ],

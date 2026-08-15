@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2025 IObundle
+# SPDX-FileCopyrightText: 2026 IObundle
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 
 # This file becomes the fpga makefile when copied to the build
 # directory
@@ -25,7 +25,7 @@ $(exit 0)
 endif
 
 #fpga toolchain
-FPGA_TOOL:=$(shell find . -name $(BOARD) | cut -d"/" -f2)
+FPGA_TOOL:=$(shell find . -mindepth 2 -maxdepth 2 -type d -name $(BOARD) | cut -d"/" -f2)
 
 ifeq ($(FPGA_TOOL),)
 $(warning Unsupported FPGA board $(BOARD) or FPGA toolchain. Check the board name and FPGA toochain installation.)
@@ -67,6 +67,9 @@ else
 ifneq ($(FPGA_STUB),)
 	scp $(FPGA_SCP_FLAGS) $(FPGA_USER)@$(FPGA_SERVER):$(REMOTE_FPGA_DIR)/$(FPGA_STUB) .
 endif
+ifneq ($(FPGA_EXTRA_DIRS),)
+	rsync $(FPGA_SYNC_FLAGS) -avz --force $(FPGA_EXTRA_DIRS:%=$(FPGA_USER)@$(FPGA_SERVER):$(REMOTE_FPGA_DIR)/%) .
+endif
 endif
 
 BOARD_SERIAL_PORT ?=/dev/usb-uart
@@ -75,7 +78,7 @@ CONSOLE_CMD ?=$(PYTHON_DIR)/console.py -s $(BOARD_SERIAL_PORT)
 
 #board client command
 GRAB_TIMEOUT ?= 300
-BOARD_GRAB_CMD=../../scripts/board_client.py grab $(GRAB_TIMEOUT)
+BOARD_GRAB_CMD=../../scripts/board_client.py grab $(GRAB_TIMEOUT) -b $(BOARD)
 
 #run fpga image
 run: build $(RUN_DEPS)
@@ -107,6 +110,14 @@ build_deps: $(RUN_DEPS)
 
 run_deps: $(RUN_DEPS)
 
+# Launch Vivado GUI with Block Design, stopping before synthesis
+gui: $(VHDR) $(VSRC) $(BUILD_DEPS)
+	$(MAKE) fpga-bd-gui
+
+# Launch Vivado GUI, run synthesis, and insert ILA debug core
+debug-ila: $(VHDR) $(VSRC) $(BUILD_DEPS)
+	$(MAKE) fpga-debug-ila
+
 debug:
 	@echo SIMULATOR=$(SIMULATOR)
 	@echo BOARD=$(BOARD)
@@ -117,4 +128,4 @@ debug:
 
 .PRECIOUS: $(FPGA_OBJ) test.log s_fw.bin
 
-.PHONY: run build clean debug test build_deps run_deps $(TEST_LIST)
+.PHONY: run build clean debug test build_deps run_deps gui debug-ila $(TEST_LIST)
