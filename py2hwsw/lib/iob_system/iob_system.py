@@ -902,6 +902,7 @@ def setup(py_params: dict):
                     "is_peripheral": True,
                     "parameters": {
                         "N_CORES": 1,
+                        "FREQ": 100000000,  # FIXME: This should not be hardcoded. Should depend on board being run.
                     },
                     "connect": {
                         "clk_en_rst_s": "clk_en_rst_s",
