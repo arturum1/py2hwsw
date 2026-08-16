@@ -261,7 +261,7 @@ int main() {
   printf_init(&uart16550_putc);
 #ifdef IOB_SYSTEM_LINUX_USE_ETHERNET
   // init eth
-  eth_init(ETH0_BASE, &flush_cache);
+  eth_init(ETH0_BASE, IOB_BSP_FREQ, &flush_cache, &printf_);
   eth_wait_phy_rst();
   // Run PHY connection debug tests
   debug_phy_connection();
