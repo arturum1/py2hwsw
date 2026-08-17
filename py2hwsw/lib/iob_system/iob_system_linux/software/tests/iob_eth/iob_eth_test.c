@@ -116,6 +116,13 @@ static struct in_addr g_soc_ip;
 static int g_host_ip_set = 0;
 static int g_soc_ip_set = 0;
 static int g_verbose = 0;
+static uint16_t g_stress_rx_delay = 2; /* inter-frame gap (ms) for Stress RX */
+static uint16_t g_stress_rx_size = 1468; /* payload size (B) for Stress RX */
+static int g_dump_dmesg = 0; /* -D: dump matching ethoc dmesg lines at start */
+/* Set when Stress RX runs in burst mode (delay == 0): line-rate bursts exceed
+ * what this 50 MHz SoC can sustain, so loss/CRC errors are a known limitation
+ * and the dmesg gates are relaxed to informational. */
+static int g_burst_info = 0;
 
 #define TEST_PASS(name)                                                        \
   do {                                                                         \
@@ -142,12 +149,16 @@ static int g_verbose = 0;
  * ethtool interface (no kernel headers dependency)
  * --------------------------------------------------------------- */
 
+/* struct ethtool_drvinfo (kernel uapi layout) */
 struct ethool_drvr_info {
   uint32_t cmd;
-  uint32_t version[32];
-  uint32_t fw_version[32];
-  uint32_t erom_version[32];
-  uint32_t bus_info[32];
+  char driver[32];
+  char version[32];
+  char fw_version[32];
+  char bus_info[32];
+  char erom_version[32];
+  char reserved2[12];
+  uint32_t n_priv_flags;
   uint32_t n_stats;
   uint32_t testinfo_len;
   uint32_t eedump_len;
@@ -178,19 +189,61 @@ struct ethool_link {
   uint32_t link;
 };
 
-struct ethool_gstring {
+/* struct ethtool_link_settings (kernel uapi layout, GET only copies base) */
+struct ethool_link_settings {
   uint32_t cmd;
-  uint32_t string_set;
-  uint32_t len;
-  uint8_t data[];
+  uint32_t speed;
+  uint8_t duplex;
+  uint8_t port;
+  uint8_t phy_address;
+  uint8_t autoneg;
+  uint8_t mdio_support;
+  uint8_t eth_tp_mdix;
+  uint8_t eth_tp_mdix_ctrl;
+  int8_t link_mode_masks_nwords;
+  uint32_t transceiver;
+  uint32_t master_slave_cfg;
+  uint32_t master_slave_state;
+  uint32_t rate_matching;
+  uint32_t reserved[7];
+};
+
+/* legacy struct ethtool_cmd (ETHTOOL_GSET fallback) */
+struct ethool_cmd {
+  uint32_t cmd;
+  uint32_t supported;
+  uint32_t advertising;
+  uint16_t speed;
+  uint8_t duplex;
+  uint8_t port;
+  uint8_t phy_address;
+  uint8_t transceiver;
+  uint8_t autoneg;
+  uint8_t mdio_support;
+  uint32_t maxtxpkt;
+  uint32_t maxrxpkt;
+  uint16_t speed_hi;
+  uint8_t eth_tp_mdix;
+  uint8_t eth_tp_mdix_ctrl;
+  uint8_t lp_advertising[4];
+  uint32_t reserved[2];
 };
 
 #define ETHOOL_GDRVINFO 0x00000003
-#define ETHOOL_GREGS 0x00000005
-#define ETHOOL_GREGS_LEN 0x00000018
-#define ETHOOL_GRINGPARAM 0x0000000a
+#define ETHOOL_GREGS 0x00000004
 #define ETHOOL_GLINK 0x0000000a
-#define ETHOOL_GSSET_INFO 0x00000037
+#define ETHOOL_GRINGPARAM 0x00000010
+#define ETHOOL_SRINGPARAM 0x00000011
+#define ETHOOL_GSET 0x00000001
+#define ETHOOL_GLINKSETTINGS 0x0000004c
+
+/* link modes (linux/mii.h) */
+#define DUPLEX_HALF 0x00
+#define DUPLEX_FULL 0x01
+#define SPEED_100 100
+
+/* IEEE-802.3 CRC-32 (LSB-first) polynomial, matches kernel ether_crc() */
+#define CRC32_POLY 0xedb88320u
 
 /* ---------------------------------------------------------------
  * Network statistics (from /proc/net/dev)
@@ -545,6 +598,9 @@ static int get_ethtool_regs(int fd, uint32_t *regs, int *count) {
 
   memset(&buf, 0, sizeof(buf));
   buf.hdr.cmd = ETHOOL_GREGS;
+  /* Request the full dump; the kernel caps it to ethoc_get_regs_len()
+   * (ETH_END = 0x54 = 21 words) and reports the real length back. */
+  buf.hdr.len = sizeof(buf.data);
 
   memset(&ifr, 0, sizeof(ifr));
   strncpy(ifr.ifr_name, g_iface, IFNAMSIZ - 1);
@@ -599,6 +655,294 @@ static int get_ethtool_link(int fd) {
     return -1;
 
   return buf.hdr.link;
+}
+
+/* ---------------------------------------------------------------
+ * Helper: set ethtool ring parameters
+ * --------------------------------------------------------------- */
+
+static int set_ethtool_ring(int fd, uint32_t tx_pending, uint32_t rx_pending) {
+  struct ethool_ringparam ring;
+  struct ifreq ifr;
+
+  memset(&ring, 0, sizeof(ring));
+  ring.cmd = ETHOOL_SRINGPARAM;
+  ring.tx_pending = tx_pending;
+  ring.rx_pending = rx_pending;
+
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, g_iface, IFNAMSIZ - 1);
+  ifr.ifr_data = (void *)&ring;
+
+  return ioctl(fd, SIOCETHTOOL, &ifr);
+}
+
+/* ---------------------------------------------------------------
+ * Helper: get ethtool driver info
+ * --------------------------------------------------------------- */
+
+static int get_ethtool_drvinfo(int fd, struct ethool_drvr_info *info) {
+  struct ifreq ifr;
+
+  memset(info, 0, sizeof(*info));
+  info->cmd = ETHOOL_GDRVINFO;
+
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, g_iface, IFNAMSIZ - 1);
+  ifr.ifr_data = (void *)info;
+
+  return ioctl(fd, SIOCETHTOOL, &ifr);
+}
+
+/* ---------------------------------------------------------------
+ * Helper: get ethtool link settings (GLINKSETTINGS w/ GSET fallback)
+ * --------------------------------------------------------------- */
+
+static int get_link_speed_duplex(int fd, uint32_t *speed, uint8_t *duplex) {
+  struct ethool_link_settings ls;
+  struct ifreq ifr;
+  int nwords = 0;
+
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, g_iface, IFNAMSIZ - 1);
+  ifr.ifr_data = (void *)&ls;
+
+  /* GLINKSETTINGS uses a two-step handshake on link_mode_masks_nwords:
+   * send 0 -> kernel replies with -(required nwords); resend with that
+   * value to obtain the real speed/duplex.  The kernel only copies the
+   * base (struct ethtool_link_settings) back to userland. */
+  memset(&ls, 0, sizeof(ls));
+  ls.cmd = ETHOOL_GLINKSETTINGS;
+  ls.link_mode_masks_nwords = 0;
+  if (ioctl(fd, SIOCETHTOOL, &ifr) == 0 && ls.link_mode_masks_nwords < 0) {
+    nwords = -ls.link_mode_masks_nwords;
+    memset(&ls, 0, sizeof(ls));
+    ls.cmd = ETHOOL_GLINKSETTINGS;
+    ls.link_mode_masks_nwords = (int8_t)nwords;
+    if (ioctl(fd, SIOCETHTOOL, &ifr) == 0) {
+      *speed = ls.speed;
+      *duplex = ls.duplex;
+      return 0;
+    }
+  }
+
+  /* Fallback to legacy ETHTOOL_GSET (the kernel converts it from
+   * get_link_ksettings() and it needs no nwords handshake). */
+  {
+    struct ethool_cmd ec;
+    memset(&ec, 0, sizeof(ec));
+    ec.cmd = ETHOOL_GSET;
+    ifr.ifr_data = (void *)&ec;
+    if (ioctl(fd, SIOCETHTOOL, &ifr) == 0) {
+      *speed = ((uint32_t)ec.speed_hi << 16) | ec.speed;
+      *duplex = ec.duplex;
+      return 0;
+    }
+  }
+
+  return -1;
+}
+
+/* ---------------------------------------------------------------
+ * Helper: hardware Ethernet CRC-32 (equivalent to kernel ether_crc)
+ * --------------------------------------------------------------- */
+
+static uint32_t bitrev32(uint32_t x) {
+  uint32_t r = 0;
+  for (int i = 0; i < 32; i++) {
+    r = (r << 1) | (x & 1);
+    x >>= 1;
+  }
+  return r;
+}
+
+/* kernel ether_crc() = bitrev32(crc32_le(~0, data, len)) */
+static uint32_t ether_crc32(const uint8_t *data, size_t len) {
+  uint32_t crc = 0xffffffffu;
+  for (size_t i = 0; i < len; i++) {
+    crc ^= data[i];
+    for (int b = 0; b < 8; b++)
+      crc = (crc >> 1) ^ (CRC32_POLY & (uint32_t)-(int32_t)(crc & 1));
+  }
+  return bitrev32(crc);
+}
+
+/* ethoc_set_multicast_list() hash bit computation */
+static void mc_hash_for_addr(const uint8_t *mc, uint32_t *hash0,
+                             uint32_t *hash1) {
+  uint32_t crc = ether_crc32(mc, 6);
+  int bit = (crc >> 26) & 0x3f;
+  if (bit < 32)
+    *hash0 |= 1u << bit;
+  else
+    *hash1 |= 1u << (bit - 32);
+}
+
+/* ---------------------------------------------------------------
+ * Helper: scan dmesg for ethoc RX/TX error lines
+ * (count of lines matching known error patterns for this interface)
+ * --------------------------------------------------------------- */
+
+static int scan_dmesg_errors(void) {
+  FILE *fp;
+  char line[512];
+  static const char *patterns[] = {
+      "wrong CRC",  "overrun",      "frame too long", "frame too short",
+      "late collision", "retransmit limit", "underrun", "dribble",
+      "carrier sense",
+  };
+  int count = 0;
+  size_t npat = sizeof(patterns) / sizeof(patterns[0]);
+
+  fp = popen("dmesg 2>/dev/null", "r");
+  if (!fp)
+    return -1;
+
+  while (fgets(line, sizeof(line), fp)) {
+    int iface_match = (strstr(line, g_iface) != NULL) ||
+                      (strstr(line, "ethoc") != NULL);
+    if (!iface_match)
+      continue;
+    for (size_t i = 0; i < npat; i++) {
+      if (strstr(line, patterns[i])) {
+        count++;
+        break;
+      }
+    }
+  }
+  pclose(fp);
+  return count;
+}
+
+/* ---------------------------------------------------------------
+ * Helper: report new dmesg error-context results since a baseline
+ * --------------------------------------------------------------- */
+
+static int report_dmesg_errors(const char *label, int baseline, int fatal) {
+  int now = scan_dmesg_errors();
+  if (now < 0) {
+    TEST_INFO(label, "dmesg unavailable (not running as root?)");
+    return 0;
+  }
+  if (now > baseline) {
+    if (fatal) {
+      TEST_FAIL(label, "ethoc reported %d RX/TX error(s) in dmesg (baseline %d)",
+                now - baseline, baseline);
+      return 1;
+    } else {
+      TEST_INFO(label,
+                "ethoc reported %d RX/TX error(s) in dmesg (baseline %d)",
+                now - baseline, baseline);
+    }
+  }
+  return 0;
+}
+
+/* ---------------------------------------------------------------
+ * Helper: snapshot every matching ethoc dmesg line (not just count)
+ * dmesg is append-only and per-line filtered, so ordering is stable:
+ * lines [base.n .. now.n) in a later snapshot are the newly-appeared ones.
+ * --------------------------------------------------------------- */
+
+#define DMESG_MAX 256
+
+typedef struct {
+  char lines[DMESG_MAX][512];
+  int n;
+} dmesg_snap;
+
+static int dmesg_snapshot(dmesg_snap *snap) {
+  FILE *fp;
+  char line[512];
+  static const char *patterns[] = {
+      "wrong CRC",  "overrun",      "frame too long", "frame too short",
+      "late collision", "retransmit limit", "underrun", "dribble",
+      "carrier sense",
+  };
+  size_t npat = sizeof(patterns) / sizeof(patterns[0]);
+  int n = 0;
+
+  fp = popen("dmesg 2>/dev/null", "r");
+  if (!fp)
+    return -1;
+
+  while (n < DMESG_MAX && fgets(line, sizeof(line), fp)) {
+    int iface_match = (strstr(line, g_iface) != NULL) ||
+                      (strstr(line, "ethoc") != NULL);
+    if (!iface_match)
+      continue;
+    for (size_t i = 0; i < npat; i++) {
+      if (strstr(line, patterns[i])) {
+        line[strcspn(line, "\n")] = '\0';
+        strncpy(snap->lines[n], line, sizeof(snap->lines[n]) - 1);
+        snap->lines[n][sizeof(snap->lines[n]) - 1] = '\0';
+        n++;
+        break;
+      }
+    }
+  }
+  pclose(fp);
+  snap->n = n;
+  return n;
+}
+
+static void dmesg_dump_new(const char *label, const dmesg_snap *base) {
+  dmesg_snap now;
+  int nn = dmesg_snapshot(&now);
+  if (nn < 0) {
+    printf("    [%s] dmesg unavailable\n", label);
+    return;
+  }
+  if (nn <= base->n) {
+    printf("    [%s] no new ethoc error line(s) (total %d)\n", label, nn);
+    return;
+  }
+  printf("    [%s] %d new ethoc error line(s) since baseline:\n", label,
+         nn - base->n);
+  for (int i = base->n; i < nn; i++)
+    printf("      %s\n", now.lines[i]);
+}
+
+static void dmesg_dump_all(const char *label) {
+  dmesg_snap s;
+  int n = dmesg_snapshot(&s);
+  if (n < 0) {
+    printf("  [%s] dmesg unavailable\n", label);
+    return;
+  }
+  if (n == 0) {
+    printf("  [%s] no matching ethoc error line(s) in dmesg\n", label);
+    return;
+  }
+  printf("  [%s] %d matching ethoc error line(s):\n", label, n);
+  for (int i = 0; i < n; i++)
+    printf("    %s\n", s.lines[i]);
+}
+
+/* ---------------------------------------------------------------
+ * Helper: Linux multicast group add/drop via IP_ADD/DROP_MEMBERSHIP
+ * --------------------------------------------------------------- */
+
+static int mcast_join(int fd, uint32_t group) {
+  struct ip_mreqn mreq;
+  memset(&mreq, 0, sizeof(mreq));
+  mreq.imr_multiaddr.s_addr = htonl(group);
+  mreq.imr_address.s_addr = g_soc_ip_set ? g_soc_ip.s_addr : htonl(INADDR_ANY);
+  mreq.imr_ifindex = if_nametoindex(g_iface);
+  if (mreq.imr_ifindex == 0)
+    return -1;
+  return setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+}
+
+static int mcast_drop(int fd, uint32_t group) {
+  struct ip_mreqn mreq;
+  memset(&mreq, 0, sizeof(mreq));
+  mreq.imr_multiaddr.s_addr = htonl(group);
+  mreq.imr_address.s_addr = g_soc_ip_set ? g_soc_ip.s_addr : htonl(INADDR_ANY);
+  mreq.imr_ifindex = if_nametoindex(g_iface);
+  if (mreq.imr_ifindex == 0)
+    return -1;
+  return setsockopt(fd, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq));
 }
 
 /* ---------------------------------------------------------------
@@ -1000,6 +1344,7 @@ static int test_mdio_access(void) {
   struct mii_ioctl_data mii;
   struct ifreq ifr;
 
+  memset(&mii, 0, sizeof(mii));
   memset(&ifr, 0, sizeof(ifr));
   strncpy(ifr.ifr_name, g_iface, IFNAMSIZ - 1);
   ifr.ifr_data = (void *)&mii;
@@ -1427,11 +1772,19 @@ static int test_loopback(void) {
   int fd;
   struct net_stats stats_before, stats_after;
   unsigned int flags;
+  uint32_t regs[64];
+  int count;
   int ok = 1;
 
   fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (fd < 0) {
     TEST_FAIL("Loopback Mode", "socket() failed");
+    return -1;
+  }
+
+  if (get_ethtool_regs(fd, regs, &count) < 0) {
+    TEST_FAIL("Loopback Mode", "get_ethtool_regs failed");
+    close(fd);
     return -1;
   }
 
@@ -1450,15 +1803,31 @@ static int test_loopback(void) {
   flags = get_iface_flags(fd);
   if (!(flags & IFF_LOOPBACK)) {
     TEST_INFO("Loopback Mode",
-              "IFF_LOOPBACK accepted but not applied by driver");
+              "IFF_LOOPBACK accepted but not applied by driver; "
+              "MODER_LOOP not asserted");
     set_iface_flags(fd, 0, IFF_LOOPBACK);
     close(fd);
     TEST_PASS("Loopback Mode");
     return 0;
   }
 
-  /* send a frame in loopback mode */
-  if (ok) {
+  /* ethoc_set_multicast_list() must have set MODER_LOOP (bit 7) */
+  if (get_ethtool_regs(fd, regs, &count) < 0) {
+    TEST_FAIL("Loopback Mode", "get_ethtool_regs failed after enabling");
+    ok = 0;
+  } else {
+    uint32_t moder = regs[REG_MODER / 4];
+    if (!(moder & MODER_LOOP)) {
+      TEST_FAIL("Loopback Mode",
+                "MODER_LOOP not set after IFF_LOOPBACK (MODER=0x%08x)", moder);
+      ok = 0;
+    } else if (g_verbose) {
+      printf("    MODER_LOOP set (MODER=0x%08x)\n", moder);
+    }
+  }
+
+  /* send a frame while loopback is enabled */
+  {
     uint8_t data[64];
     for (int i = 0; i < (int)sizeof(data); i++)
       data[i] = (uint8_t)i;
@@ -1473,8 +1842,17 @@ static int test_loopback(void) {
   usleep(200000);
   get_stats(&stats_after);
 
-  /* clear loopback */
-  set_iface_flags(fd, 0, IFF_LOOPBACK);
+  /* clear loopback: MODER_LOOP must be removed by the driver */
+  if (set_iface_flags(fd, 0, IFF_LOOPBACK) < 0)
+    TEST_FAIL("Loopback Mode", "Failed to clear IFF_LOOPBACK");
+  else if (get_ethtool_regs(fd, regs, &count) == 0 &&
+           (regs[REG_MODER / 4] & MODER_LOOP)) {
+    TEST_FAIL("Loopback Mode",
+              "MODER_LOOP still set after clearing IFF_LOOPBACK (MODER=0x%08x)",
+              regs[REG_MODER / 4]);
+    ok = 0;
+  }
+
   close(fd);
 
   if (ok) {
@@ -1484,10 +1862,13 @@ static int test_loopback(void) {
       printf("    RX packets: %lu -> %lu\n", stats_before.rx_packets,
              stats_after.rx_packets);
     }
-    (void)flags;
-    TEST_INFO("Loopback Mode", "TX delta=%lu, RX delta=%lu (MODER_LOOP active)",
+    /* IOb-Eth HW has no loopback data path (dest MAC is not compared);
+       MODER_LOOP is register-only, so no self-RX is expected. */
+    TEST_INFO("Loopback Mode",
+              "TX delta=%lu, RX delta=%lu "
+              "(MODER_LOOP asserted; HW loopback data path is a known gap)",
               stats_after.tx_packets - stats_before.tx_packets,
-              stats_after.rx_packets - stats_before.rx_packets);
+              (long)stats_after.rx_packets - stats_before.rx_packets);
   }
 
   if (ok)
@@ -1622,7 +2003,392 @@ static int test_ring_params(void) {
 }
 
 /* ===============================================================
- * TEST 16: ethtool Register Dump
+ * TEST 16: ethtool Set Ring Parameters (ring reinit under traffic)
+ * =============================================================== */
+
+static int do_echo_roundtrip(int *failed) {
+  int fd = create_test_socket(TEST_ETH_PORT);
+  uint8_t data[64];
+  uint16_t resp_len;
+  int rc = -1;
+
+  if (fd < 0) {
+    if (failed)
+      *failed = 0;
+    return -1;
+  }
+  for (int i = 0; i < (int)sizeof(data); i++)
+    data[i] = (uint8_t)(i & 0xFF);
+  if (send_cmd(fd, CMD_ECHO, data, sizeof(data), NULL, 0, &resp_len) == 0)
+    rc = 0;
+  else if (failed)
+    *failed = 0;
+  close(fd);
+  return rc;
+}
+
+/* echo with retries to ride out the transient of a live ring re-init */
+static int do_echo_roundtrip_retry(int *failed, int attempts) {
+  for (int i = 0; i < attempts; i++) {
+    if (do_echo_roundtrip(failed) == 0)
+      return 0;
+    usleep(200000);
+  }
+  return -1;
+}
+
+/* generic SIOCETHTOOL ring-param ioctl (cmd field already set in *ring) */
+static int ring_set_ioctl(int fd, struct ethool_ringparam *ring) {
+  struct ifreq ifr;
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, g_iface, IFNAMSIZ - 1);
+  ifr.ifr_data = (void *)ring;
+  return ioctl(fd, SIOCETHTOOL, &ifr);
+}
+
+static int test_ringparam_set(void) {
+  int fd;
+  struct ethool_ringparam ring, bad;
+  uint32_t regs[64];
+  int count;
+  uint32_t orig_tx = 0, orig_rx = 0;
+  int ok = 1;
+
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0) {
+    TEST_FAIL("Ring Set", "socket() failed");
+    return -1;
+  }
+
+  if (get_ethtool_ring(fd, &ring) < 0) {
+    TEST_FAIL("Ring Set", "get_ringparam failed: %s", strerror(errno));
+    close(fd);
+    return -1;
+  }
+  orig_tx = ring.tx_pending;
+  orig_rx = ring.rx_pending;
+
+  /* --- invalid requests must be rejected by ethoc_set_ringparam --- */
+  bad = ring;
+  bad.cmd = ETHOOL_SRINGPARAM;
+  bad.tx_pending = 0;
+  bad.rx_pending = orig_rx;
+  bad.rx_mini_pending = 0;
+  bad.rx_jumbo_pending = 0;
+  if (ring_set_ioctl(fd, &bad) == 0) {
+    TEST_FAIL("Ring Set", "tx_pending=0 accepted (should be -EINVAL)");
+    ok = 0;
+  }
+
+  bad = ring;
+  bad.cmd = ETHOOL_SRINGPARAM;
+  bad.tx_pending = orig_tx + orig_rx; /* exceed num_bd */
+  bad.rx_pending = orig_rx;
+  bad.rx_mini_pending = 0;
+  bad.rx_jumbo_pending = 0;
+  if (ring_set_ioctl(fd, &bad) == 0) {
+    TEST_FAIL("Ring Set", "tx+rx > num_bd accepted (should be -EINVAL)");
+    ok = 0;
+  }
+
+  bad = ring;
+  bad.cmd = ETHOOL_SRINGPARAM;
+  bad.tx_pending = orig_tx;
+  bad.rx_pending = orig_rx;
+  bad.rx_mini_pending = 1;
+  bad.rx_jumbo_pending = 0;
+  if (ring_set_ioctl(fd, &bad) == 0) {
+    TEST_FAIL("Ring Set", "rx_mini_pending != 0 accepted (should be -EINVAL)");
+    ok = 0;
+  }
+
+  /* --- valid reinit while running (sizes must fit the BD count) --- */
+  /* ethoc_set_ringparam() rejects tx+rx > num_bd and rounds tx down to a
+   * power of two (num_bd = max_pending + 1 here).  Derive safe values. */
+  {
+    uint32_t num_bd = ring.tx_max_pending + 1;
+    uint32_t tgt_tx = 8, tgt_rx = 12;
+
+    while (tgt_tx > ring.tx_max_pending)
+      tgt_tx >>= 1;
+    if (tgt_tx < 1)
+      tgt_tx = 1;
+    if (tgt_tx + tgt_rx > num_bd)
+      tgt_rx = tgt_tx < num_bd ? (num_bd - tgt_tx) : 1;
+    if (tgt_rx < 1)
+      tgt_rx = 1;
+
+    errno = 0;
+    if (set_ethtool_ring(fd, tgt_tx, tgt_rx) < 0) {
+      TEST_FAIL("Ring Set", "set_ringparam(%u,%u) failed: %s", tgt_tx,
+                tgt_rx, strerror(errno));
+      ok = 0;
+    } else if (get_ethtool_ring(fd, &ring) == 0) {
+      if (ring.tx_pending != tgt_tx || ring.rx_pending != tgt_rx) {
+        TEST_FAIL("Ring Set", "after set(%u,%u): tx=%u rx=%u", tgt_tx,
+                  tgt_rx, ring.tx_pending, ring.rx_pending);
+        ok = 0;
+      }
+      if (get_ethtool_regs(fd, regs, &count) == 0 &&
+          regs[REG_TX_BD_NUM / 4] != tgt_tx) {
+        TEST_FAIL("Ring Set", "TX_BD_NUM reg = %u, expected %u",
+                  regs[REG_TX_BD_NUM / 4], tgt_tx);
+        ok = 0;
+      }
+    } else {
+      TEST_FAIL("Ring Set", "get_ringparam failed after set");
+      ok = 0;
+    }
+
+    /* connectivity must survive the ring reinit */
+    if (ok && do_echo_roundtrip_retry(&ok, 3) != 0)
+      TEST_FAIL("Ring Set", "echo failed after ring reinit to %u/%u", tgt_tx,
+                tgt_rx);
+  }
+
+  /* --- restore original ring params --- */
+  errno = 0;
+  if (set_ethtool_ring(fd, orig_tx, orig_rx) < 0) {
+    TEST_FAIL("Ring Set", "failed to restore ring to %u/%u: %s", orig_tx,
+              orig_rx, strerror(errno));
+    ok = 0;
+  } else if (get_ethtool_ring(fd, &ring) == 0) {
+    if (ring.tx_pending != orig_tx || ring.rx_pending != orig_rx) {
+      TEST_FAIL("Ring Set", "after restore: tx=%u rx=%u, expected %u/%u",
+                ring.tx_pending, ring.rx_pending, orig_tx, orig_rx);
+      ok = 0;
+    }
+  }
+
+  /* connectivity must work again with restored rings */
+  if (ok && do_echo_roundtrip_retry(&ok, 3) != 0)
+    TEST_FAIL("Ring Set", "echo failed after restoring ring params");
+
+  close(fd);
+
+  if (ok)
+    TEST_PASS("Ring Set");
+
+  return ok ? 0 : -1;
+}
+
+/* ===============================================================
+ * TEST 17: ethtool Driver Info
+ * =============================================================== */
+
+static int test_drvinfo(void) {
+  int fd;
+  struct ethool_drvr_info info;
+  int ok = 1;
+
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0) {
+    TEST_FAIL("Driver Info", "socket() failed");
+    return -1;
+  }
+
+  if (get_ethtool_drvinfo(fd, &info) < 0) {
+    TEST_FAIL("Driver Info", "ETHTOOL_GDRVINFO failed: %s", strerror(errno));
+    close(fd);
+    return -1;
+  }
+  close(fd);
+
+  if (g_verbose)
+    printf("    driver=%s version=%s regdump_len=%u\n", info.driver,
+           info.version, info.regdump_len);
+
+  if (strcmp(info.driver, "ethoc") != 0) {
+    TEST_FAIL("Driver Info", "driver = '%s', expected 'ethoc'", info.driver);
+    ok = 0;
+  }
+
+  /* ethoc_get_regs_len() returns ETH_END = 0x54 */
+  if (info.regdump_len != 0x54) {
+    TEST_FAIL("Driver Info", "regdump_len = %u, expected %u (ETH_END)",
+              info.regdump_len, 0x54);
+    ok = 0;
+  }
+
+  if (ok)
+    TEST_PASS("Driver Info");
+
+  return ok ? 0 : -1;
+}
+
+/* ===============================================================
+ * TEST 18: ethtool Link Settings (speed/duplex)
+ * =============================================================== */
+
+static int test_ksettings(void) {
+  int fd;
+  uint32_t speed;
+  uint8_t duplex;
+  int link;
+
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0) {
+    TEST_FAIL("Link Settings", "socket() failed");
+    return -1;
+  }
+
+  link = get_ethtool_link(fd);
+  if (link < 0) {
+    TEST_FAIL("Link Settings", "get_link failed");
+    close(fd);
+    return -1;
+  }
+
+  if (link == 0) {
+    TEST_INFO("Link Settings", "link down; speed/duplex not reported");
+    TEST_PASS("Link Settings");
+    close(fd);
+    return 0;
+  }
+
+  if (get_link_speed_duplex(fd, &speed, &duplex) < 0) {
+    TEST_FAIL("Link Settings", "get_link_settings failed: %s",
+              strerror(errno));
+    close(fd);
+    return -1;
+  }
+  close(fd);
+
+  if (g_verbose)
+    printf("    speed=%u Mbps duplex=%u (%s)\n", speed, duplex,
+           duplex == DUPLEX_FULL ? "full" : "half");
+
+  if (speed != SPEED_100) {
+    TEST_FAIL("Link Settings", "speed = %u, expected 100 Mbps", speed);
+    return -1;
+  }
+  if (duplex != DUPLEX_FULL) {
+    TEST_FAIL("Link Settings", "duplex = %u, expected FULL", duplex);
+    return -1;
+  }
+
+  TEST_PASS("Link Settings");
+  return 0;
+}
+
+/* ===============================================================
+ * TEST 19: Multicast Hash (IFF_ALLMULTI + hash register write-back)
+ * =============================================================== */
+
+static int get_hash_regs(int fd, uint32_t *hash0, uint32_t *hash1) {
+  uint32_t regs[64];
+  int count;
+  if (get_ethtool_regs(fd, regs, &count) < 0)
+    return -1;
+  *hash0 = regs[REG_ETH_HASH0 / 4];
+  *hash1 = regs[REG_ETH_HASH1 / 4];
+  return 0;
+}
+
+static int test_multicast_hash(void) {
+  int fd;
+  uint32_t hash0 = 0, hash1 = 0, base0 = 0, base1 = 0;
+  uint32_t group = (239u << 24) | (1u << 16) | (2u << 8) | 3u;
+  uint8_t mc[6] = {0x01, 0x00, 0x5e, 0x01, 0x02, 0x03};
+  uint32_t exp0 = 0, exp1 = 0;
+  int mfd = -1;
+  int ok = 1;
+
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0) {
+    TEST_FAIL("Multicast Hash", "socket() failed");
+    return -1;
+  }
+
+  /* baseline hash (assume empty MC list at this point) */
+  if (get_hash_regs(fd, &base0, &base1) < 0) {
+    TEST_FAIL("Multicast Hash", "get_ethtool_regs failed");
+    close(fd);
+    return -1;
+  }
+
+  /* --- IFF_ALLMULTI -> hash registers must go to 0xffffffff --- */
+  if (set_iface_flags(fd, IFF_ALLMULTI, 0) < 0) {
+    TEST_FAIL("Multicast Hash", "Failed to set IFF_ALLMULTI");
+    ok = 0;
+  } else if (get_hash_regs(fd, &hash0, &hash1) < 0) {
+    TEST_FAIL("Multicast Hash", "get_ethtool_regs failed (allmulti)");
+    ok = 0;
+  } else if (hash0 != 0xffffffffu || hash1 != 0xffffffffu) {
+    TEST_FAIL("Multicast Hash",
+              "IFF_ALLMULTI hash = %08x/%08x, expected ffffffff/ffffffff",
+              hash0, hash1);
+    ok = 0;
+  }
+  set_iface_flags(fd, 0, IFF_ALLMULTI);
+
+  /* --- join one multicast group -> derived hash bit set --- */
+  mfd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (mfd < 0) {
+    TEST_FAIL("Multicast Hash", "mcast socket() failed");
+    ok = 0;
+  } else if (mcast_join(mfd, group) < 0) {
+    TEST_FAIL("Multicast Hash", "IP_ADD_MEMBERSHIP failed: %s",
+              strerror(errno));
+    ok = 0;
+    mfd = -1;
+  }
+
+  if (ok && mfd >= 0) {
+    mc_hash_for_addr(mc, &exp0, &exp1);
+    if (get_hash_regs(fd, &hash0, &hash1) < 0) {
+      TEST_FAIL("Multicast Hash", "get_ethtool_regs failed (join)");
+      ok = 0;
+    } else {
+      if (exp0 && (hash0 & exp0) == 0) {
+        TEST_FAIL("Multicast Hash", "HASH0 missing expected bit 0x%08x (%08x)",
+                  exp0, hash0);
+        ok = 0;
+      }
+      if (exp1 && (hash1 & exp1) == 0) {
+        TEST_FAIL("Multicast Hash", "HASH1 missing expected bit 0x%08x (%08x)",
+                  exp1, hash1);
+        ok = 0;
+      }
+      if (g_verbose)
+        printf("    join 239.1.2.3: hash=%08x/%08x expected bit=%08x/%08x\n",
+               hash0, hash1, exp0, exp1);
+    }
+  }
+
+  /* --- leave group -> expected bit must be cleared --- */
+  if (ok && mfd >= 0 && mcast_drop(mfd, group) == 0) {
+    if (get_hash_regs(fd, &hash0, &hash1) < 0) {
+      TEST_FAIL("Multicast Hash", "get_ethtool_regs failed (leave)");
+      ok = 0;
+    } else {
+      if (exp0 && (hash0 & exp0) != 0) {
+        TEST_FAIL("Multicast Hash", "HASH0 bit 0x%08x still set after leave",
+                  exp0);
+        ok = 0;
+      }
+      if (exp1 && (hash1 & exp1) != 0) {
+        TEST_FAIL("Multicast Hash", "HASH1 bit 0x%08x still set after leave",
+                  exp1);
+        ok = 0;
+      }
+    }
+  }
+
+  if (mfd >= 0) {
+    mcast_drop(mfd, group);
+    close(mfd);
+  }
+  close(fd);
+
+  if (ok)
+    TEST_PASS("Multicast Hash");
+
+  return ok ? 0 : -1;
+}
+
+/* ===============================================================
+ * TEST 20: ethtool Register Dump
  * =============================================================== */
 
 static int test_register_dump(void) {
@@ -1680,7 +2446,7 @@ static int test_register_dump(void) {
 }
 
 /* ===============================================================
- * TEST 17: Interrupt Verification
+ * TEST 21: Interrupt Verification
  * =============================================================== */
 
 static int test_interrupts(void) {
@@ -1739,7 +2505,7 @@ static int test_interrupts(void) {
 }
 
 /* ===============================================================
- * TEST 18: Error Counter Clean Check
+ * TEST 22: Error Counter Clean Check
  * =============================================================== */
 
 static int test_error_counters(void) {
@@ -1802,16 +2568,17 @@ static int test_error_counters(void) {
 }
 
 /* ===============================================================
- * TEST 19: Stress TX Burst
+ * TEST 23: Stress TX Burst
  * =============================================================== */
 
 static int test_stress_tx(void) {
   int fd;
   struct net_stats stats_before, stats_after;
-  uint16_t count = 50;
-  uint16_t size = 512;
+  uint16_t count = 200;
+  uint16_t size = 1468;
   uint8_t payload[4];
   uint16_t resp_len;
+  dmesg_snap dm_base;
   int ok = 1;
 
   fd = create_test_socket(TEST_ETH_PORT);
@@ -1820,6 +2587,7 @@ static int test_stress_tx(void) {
     return -1;
   }
 
+  dmesg_snapshot(&dm_base);
   get_stats(&stats_before);
 
   /* tell host to expect 'count' frames of 'size' bytes */
@@ -1835,7 +2603,7 @@ static int test_stress_tx(void) {
   }
 
   if (ok) {
-    uint8_t data[512];
+    uint8_t data[1468];
     for (int i = 0; i < count; i++) {
       memset(data, (uint8_t)(i & 0xFF), size);
       if (send_raw(fd, CMD_ECHO, data, size) < 0) {
@@ -1846,7 +2614,7 @@ static int test_stress_tx(void) {
     }
   }
 
-  usleep(500000);
+  usleep(800000);
   get_stats(&stats_after);
   close(fd);
 
@@ -1865,6 +2633,10 @@ static int test_stress_tx(void) {
     }
   }
 
+  dmesg_dump_new("Stress TX dmesg", &dm_base);
+  if (report_dmesg_errors("Stress TX dmesg", dm_base.n, 1))
+    ok = 0;
+
   if (ok)
     TEST_PASS("Stress TX");
 
@@ -1872,18 +2644,25 @@ static int test_stress_tx(void) {
 }
 
 /* ===============================================================
- * TEST 20: Stress RX Burst
+ * TEST 24: Stress RX Burst
  * =============================================================== */
 
 static int test_stress_rx(void) {
   int fd;
   struct net_stats stats_before, stats_after;
-  uint16_t count = 10;
-  uint16_t size = 512;
-  uint8_t payload[4];
+  uint16_t count = 200;
+  uint16_t size = g_stress_rx_size; /* default 1468; -b to sweep */
+  uint16_t delay = g_stress_rx_delay; /* 0 = back-to-back (default) */
+  uint8_t payload[6];
   struct cmd_packet pkt;
   int received = 0;
+  unsigned long irq_before = 0, irq_after = 0;
+  dmesg_snap dm_base;
   int ok = 1;
+  int probe_ok = 0;
+  int burst = (delay == 0); /* line-rate burst; loss is a known limitation */
+  if (burst)
+    g_burst_info = 1;
 
   fd = create_test_socket(TEST_ETH_PORT);
   if (fd < 0) {
@@ -1891,20 +2670,28 @@ static int test_stress_rx(void) {
     return -1;
   }
 
+  dmesg_snapshot(&dm_base);
   get_stats(&stats_before);
+  get_irq_count(&irq_before);
 
-  /* tell host to send 'count' frames of 'size' bytes */
+  /* limit size to fit into MTU payload (1500-20-8-4=1468) */
+  if (size > 1468)
+    size = 1468;
+
+  /* tell host to send 'count' frames of 'size' bytes, 'delay*ms' apart */
   payload[0] = (count >> 8) & 0xFF;
   payload[1] = count & 0xFF;
   payload[2] = (size >> 8) & 0xFF;
   payload[3] = size & 0xFF;
+  payload[4] = (delay >> 8) & 0xFF;
+  payload[5] = delay & 0xFF;
 
   if (send_raw(fd, CMD_STRESS_RX, payload, sizeof(payload)) < 0) {
     TEST_FAIL("Stress RX", "send_raw failed");
     ok = 0;
   }
 
-  /* receive frames (host sends count CMD_ECHO frames + 1 ack) */
+  /* receive frames (host sends 'count' CMD_ECHO frames) */
   if (ok) {
     while (received < count) {
       if (recv_cmd(fd, &pkt, 3000) < 0)
@@ -1913,23 +2700,58 @@ static int test_stress_rx(void) {
     }
   }
 
-  usleep(200000);
+  usleep(300000);
   get_stats(&stats_after);
+  get_irq_count(&irq_after);
   close(fd);
 
+  /* liveness probe: if small 32B ECHO round-trips now, RX is not fully wedged */
+  {
+    int pfd = create_test_socket(TEST_ETH_PORT);
+    if (pfd >= 0) {
+      uint8_t probe[32];
+      memset(probe, 0xAB, sizeof(probe));
+      if (send_cmd(pfd, CMD_ECHO, probe, sizeof(probe), NULL, 0, NULL) == 0)
+        probe_ok = 1;
+      close(pfd);
+    }
+  }
+
   if (ok) {
-    if (g_verbose)
-      printf("    RX: received %d/%d frames\n", received, count);
+    unsigned long rxp = stats_after.rx_packets - stats_before.rx_packets;
+    unsigned long rxb = stats_after.rx_bytes - stats_before.rx_bytes;
+    unsigned long rxerr = stats_after.rx_errors - stats_before.rx_errors;
+    printf("    RX: received %d/%d frames (payload %d, %d ms gap)\n", received,
+           count, size, delay);
+    printf("      rx_packets delta +%lu, rx_bytes delta +%lu, "
+           "rx_errors delta +%lu\n",
+           rxp, rxb, rxerr);
+    printf("      IRQ delta: %lu -> %lu (+%lu), post-stress 32B echo: %s\n",
+           irq_before, irq_after, irq_after - irq_before,
+           probe_ok ? "PASS" : "FAIL");
 
     if (received < count) {
-      TEST_FAIL("Stress RX", "Only received %d/%d frames", received, count);
-      ok = 0;
+      if (burst) {
+        TEST_INFO("Stress RX",
+                  "Only received %d/%d frames under line-rate burst (known "
+                  "limitation: 50 MHz SoC cannot sustain 100 Mbps back-to-back)",
+                  received, count);
+      } else {
+        TEST_FAIL("Stress RX", "Only received %d/%d frames under burst",
+                  received, count);
+        ok = 0;
+      }
     }
     if (stats_after.rx_errors > stats_before.rx_errors) {
-      TEST_FAIL("Stress RX", "rx_errors increased during stress");
+      TEST_FAIL("Stress RX", "rx_errors aggregate increased (+%lu); see dmesg "
+               "for sub-counter (overrun/CRC) detail", rxerr);
       ok = 0;
     }
   }
+
+  dmesg_dump_new("Stress RX dmesg", &dm_base);
+  if (report_dmesg_errors("Stress RX dmesg", dm_base.n, !burst))
+    ok = 0;
 
   if (ok)
     TEST_PASS("Stress RX");
@@ -1938,14 +2760,16 @@ static int test_stress_rx(void) {
 }
 
 /* ===============================================================
- * TEST 21: Stress Bidirectional
+ * TEST 25: Stress Bidirectional
  * =============================================================== */
 
 static int test_stress_bidir(void) {
   int fd;
   struct net_stats stats_before, stats_after;
-  uint8_t data[256];
+  uint8_t data[1024];
   int sent = 0, received = 0;
+  int iters = 200;
+  dmesg_snap dm_base;
   int ok = 1;
 
   fd = create_test_socket(TEST_ETH_PORT);
@@ -1954,30 +2778,33 @@ static int test_stress_bidir(void) {
     return -1;
   }
 
+  dmesg_snapshot(&dm_base);
   get_stats(&stats_before);
 
   /* interleave TX and RX: send one, receive one, repeat */
-  for (int i = 0; i < 50; i++) {
-    /* TX */
+  for (int i = 0; i < iters; i++) {
+    struct cmd_packet pkt;
     memset(data, (uint8_t)(i & 0xFF), sizeof(data));
     if (send_raw(fd, CMD_ECHO, data, sizeof(data)) > 0)
       sent++;
-
-    /* try to RX */
-    struct cmd_packet pkt;
-    if (recv_cmd(fd, &pkt, 500) == 0)
+    if (recv_cmd(fd, &pkt, 1000) == 0)
       received++;
   }
 
-  usleep(200000);
+  usleep(300000);
   get_stats(&stats_after);
   close(fd);
 
   if (g_verbose)
-    printf("    Bidirectional: sent=%d, received=%d\n", sent, received);
+    printf("    Bidirectional: sent=%d, received=%d (expected %d)\n", sent,
+           received, sent);
 
   if (sent == 0) {
     TEST_FAIL("Stress Bidirectional", "No frames sent");
+    ok = 0;
+  } else if (received != sent) {
+    TEST_FAIL("Stress Bidirectional", "Full-duplex loss: sent %d, received %d",
+              sent, received);
     ok = 0;
   }
 
@@ -1991,6 +2818,10 @@ static int test_stress_bidir(void) {
     ok = 0;
   }
 
+  dmesg_dump_new("Stress Bidirectional dmesg", &dm_base);
+  if (report_dmesg_errors("Stress Bidirectional dmesg", dm_base.n, 1))
+    ok = 0;
+
   if (ok)
     TEST_PASS("Stress Bidirectional");
 
@@ -1998,12 +2829,15 @@ static int test_stress_bidir(void) {
 }
 
 /* ===============================================================
- * TEST 22: Interface Down
+ * TEST 26: Interface Down/Up Integrity
  * =============================================================== */
 
 static int test_interface_down(void) {
   int fd;
   unsigned int flags;
+  uint32_t regs[64];
+  int count;
+  unsigned long irq_before = 0, irq_after = 0;
   int ok = 1;
 
   fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -2011,6 +2845,8 @@ static int test_interface_down(void) {
     TEST_FAIL("Interface Down", "socket() failed");
     return -1;
   }
+
+  get_irq_count(&irq_before);
 
   /* bring interface down */
   if (set_iface_flags(fd, 0, IFF_UP) < 0) {
@@ -2025,26 +2861,66 @@ static int test_interface_down(void) {
     ok = 0;
   }
 
-  /* bring back up for subsequent tests */
-  set_iface_flags(fd, IFF_UP | IFF_RUNNING, 0);
-  usleep(100000);
-
-  flags = get_iface_flags(fd);
-  if (!(flags & IFF_UP)) {
+  /* bring back up */
+  if (set_iface_flags(fd, IFF_UP | IFF_RUNNING, 0) < 0) {
     TEST_FAIL("Interface Down", "Failed to bring interface back up");
     ok = 0;
+  } else {
+    usleep(300000);
+    flags = get_iface_flags(fd);
+    if (!(flags & IFF_UP)) {
+      TEST_FAIL("Interface Down", "Interface not UP after re-open");
+      ok = 0;
+    } else {
+      /* ethoc_open must restore MODER defaults and re-arm IRQs */
+      if (get_ethtool_regs(fd, regs, &count) == 0) {
+        uint32_t moder = regs[REG_MODER / 4];
+        if ((moder & (MODER_RXEN | MODER_TXEN)) != (MODER_RXEN | MODER_TXEN)) {
+          TEST_FAIL("Interface Down",
+                    "After re-open MODER lacks RXEN|TXEN (MODER=0x%08x)",
+                    moder);
+          ok = 0;
+        }
+        if (regs[REG_INT_MASK / 4] != INT_MASK_ALL) {
+          TEST_FAIL("Interface Down",
+                    "After re-open INT_MASK = 0x%08x, expected 0x%02x",
+                    regs[REG_INT_MASK / 4], INT_MASK_ALL);
+          ok = 0;
+        }
+        if (regs[REG_TX_BD_NUM / 4] == 0 || regs[REG_TX_BD_NUM / 4] > 0x80) {
+          TEST_FAIL("Interface Down",
+                    "After re-open TX_BD_NUM = %u out of range",
+                    regs[REG_TX_BD_NUM / 4]);
+          ok = 0;
+        }
+      }
+
+      /* connectivity must survive ethoc_open/ethoc_stop cycle */
+      if (ok && do_echo_roundtrip(&ok) != 0)
+        TEST_FAIL("Interface Down", "echo failed after down/up cycle");
+
+      /* IRQs must fire again for post-re-open traffic */
+      usleep(200000);
+      if (get_irq_count(&irq_after) == 0) {
+        if (irq_after <= irq_before)
+          TEST_INFO("Interface Down",
+                    "IRQ count did not increase after re-open "
+                    "(before=%lu after=%lu)",
+                    irq_before, irq_after);
+      }
+    }
   }
 
   close(fd);
 
   if (ok)
-    TEST_PASS("Interface Down");
+    TEST_PASS("Interface Down/Up");
 
   return ok ? 0 : -1;
 }
 
 /* ===============================================================
- * TEST 23: Final Statistics Summary
+ * TEST 27: Final Statistics & Connectivity Gate
  * =============================================================== */
 
 static int test_final_summary(void) {
@@ -2095,8 +2971,39 @@ static int test_final_summary(void) {
       printf("    %-20s %s\n", "mtu:", mtu_buf);
   }
 
-  TEST_PASS("Final Statistics Summary");
-  return 0;
+  /* final connectivity gate: a clean echo round-trip must still work */
+  int gate_ok = 1;
+  if (do_echo_roundtrip(&gate_ok) != 0) {
+    TEST_FAIL("Final Connectivity",
+              "No echo reply at end of suite (link/ring/IRQ broken)");
+    gate_ok = 0;
+  } else {
+    TEST_PASS("Final Connectivity");
+  }
+
+  /* final dmesg error scan across the whole run */
+  {
+    int now = scan_dmesg_errors();
+    if (now < 0) {
+      TEST_INFO("Final Connectivity", "dmesg unavailable");
+    } else if (now > 0) {
+      if (g_burst_info) {
+        TEST_INFO("dmesg",
+                  "%d ethoc RX/TX error line(s) in kernel log (line-rate "
+                  "Stress RX burst; known limitation on 50 MHz SoC)", now);
+      } else {
+        TEST_FAIL("dmesg", "%d ethoc RX/TX error line(s) in kernel log", now);
+        gate_ok = 0;
+      }
+    } else if (g_verbose) {
+      printf("    No ethoc RX/TX errors in dmesg\n");
+    }
+  }
+
+  if (gate_ok)
+    TEST_PASS("Final Summary & Connectivity");
+
+  return gate_ok ? 0 : -1;
 }
 
 /* ===============================================================
@@ -2111,6 +3018,14 @@ static void print_usage(const char *prog) {
   fprintf(stderr, "  -s <soc_ip>     SoC IP address\n");
   fprintf(stderr, "  -c <host_ip>    Host IP address\n");
   fprintf(stderr, "  -v              Verbose output\n");
+  fprintf(stderr,
+          "  -d <ms>         Stress-RX inter-frame gap in ms (default 2; "
+          "0 = back-to-back, informational only on 50 MHz SoC)\n");
+  fprintf(stderr,
+          "  -b <bytes>      Stress-RX payload size in bytes (default 1468)\n");
+  fprintf(stderr,
+          "  -D              Dump all matching ethoc dmesg error lines at "
+          "startup\n");
   fprintf(stderr, "  -h              Show this help\n");
 }
 
@@ -2124,7 +3039,7 @@ int main(int argc, char *argv[]) {
   /* defaults */
   memset(g_iface, 0, sizeof(g_iface));
 
-  while ((opt = getopt(argc, argv, "i:s:c:vh")) != -1) {
+  while ((opt = getopt(argc, argv, "i:s:c:d:b:vDh")) != -1) {
     switch (opt) {
     case 'i':
       strncpy(g_iface, optarg, IFNAMSIZ - 1);
@@ -2137,8 +3052,29 @@ int main(int argc, char *argv[]) {
       inet_aton(optarg, &g_host_ip);
       g_host_ip_set = 1;
       break;
+    case 'd': {
+      long v = strtol(optarg, NULL, 10);
+      if (v < 0)
+        v = 0;
+      if (v > 65535)
+        v = 65535;
+      g_stress_rx_delay = (uint16_t)v;
+      break;
+    }
+    case 'b': {
+      long v = strtol(optarg, NULL, 10);
+      if (v < 4)
+        v = 4;
+      if (v > 1468)
+        v = 1468;
+      g_stress_rx_size = (uint16_t)v;
+      break;
+    }
     case 'v':
       g_verbose = 1;
+      break;
+    case 'D':
+      g_dump_dmesg = 1;
       break;
     case 'h':
     default:
@@ -2156,6 +3092,9 @@ int main(int argc, char *argv[]) {
   printf("IOb-ETH ethoc Driver Compatibility Test\n");
   printf("Host IP: %s\n", inet_ntoa(g_host_ip));
   printf("\n");
+
+  if (g_dump_dmesg)
+    dmesg_dump_all("baseline");
 
   /* Test 1: find ethoc interface */
   if (test_interface_detection() < 0) {
@@ -2218,13 +3157,25 @@ int main(int argc, char *argv[]) {
   /* Test 15: ring parameters */
   test_ring_params();
 
-  /* Test 16: register dump */
+  /* Test 16: ring parameter set (reinit under traffic) */
+  test_ringparam_set();
+
+  /* Test 17: driver info */
+  test_drvinfo();
+
+  /* Test 18: link settings (speed/duplex) */
+  test_ksettings();
+
+  /* Test 19: multicast hash */
+  test_multicast_hash();
+
+  /* Test 20: register dump */
   test_register_dump();
 
-  /* Test 17: interrupts */
+  /* Test 21: interrupts */
   test_interrupts();
 
-  /* Test 18: error counters (mid-test check) */
+  /* Test 22: error counters (mid-test check) */
   test_error_counters();
 
   /* warm up ARP cache again before stress tests */
@@ -2240,19 +3191,19 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  /* Test 19: stress TX */
+  /* Test 23: stress TX */
   test_stress_tx();
 
-  /* Test 20: stress RX */
+  /* Test 24: stress RX */
   test_stress_rx();
 
-  /* Test 21: stress bidirectional */
+  /* Test 25: stress bidirectional */
   test_stress_bidir();
 
-  /* Test 22: interface down */
+  /* Test 26: interface down/up integrity */
   test_interface_down();
 
-  /* Test 23: final summary */
+  /* Test 27: final summary + connectivity gate + dmesg scan */
   test_final_summary();
 
   /* Overall verdict */

@@ -17,8 +17,13 @@
 #   -s <soc_ip>      SoC IP address (default: 192.168.1.10)
 #   -c <host_ip>     Host IP address (default: auto-detect)
 #   -i <interface>   Host Ethernet interface (default: auto-detect)
-#   -S <ssh_user>    SSH user for SoC (enables remote execution)
-#   -p <password>    SSH password for SoC (requires sshpass on host)
+#   -S <ssh_user>   SSH user for SoC (enables remote execution)
+#   -p <password>   SSH password for SoC (requires sshpass on host)
+#   --no-ping        Skip the pre/post ping connectivity gate
+#   -d <ms>          Stress-RX inter-frame gap in ms (default 2; 0 = back-to-back, informational only on 50 MHz SoC)
+#   -b <bytes>       Stress-RX payload size in bytes (default 1468)
+#   --downup         After the run, recycle the SoC link (down/up) and
+#                    re-test ping to characterize the post-wedge recovery
 #   -v               Verbose output
 #   -h               Show this help
 #
@@ -46,6 +51,10 @@ TEST_BIN="$SCRIPT_DIR/iob_eth_test"
 PORT=9000
 HOST_PID=""
 VERBOSE=""
+PING_ENABLED=1
+STRESS_DELAY=""
+STRESS_SIZE=""
+RUN_DOWNUP=0
 
 usage() {
     sed -n '3,/^$/s/^#//p' "$0"
@@ -60,13 +69,24 @@ while [ $# -gt 0 ]; do
         -i) INTERFACE="$2"; shift 2 ;;
         -S) SSH_USER="$2"; shift 2 ;;
         -p) SSH_PASS="$2"; shift 2 ;;
+        -d) STRESS_DELAY="$2"; shift 2 ;;
+        -b) STRESS_SIZE="$2"; shift 2 ;;
+        --downup) RUN_DOWNUP=1; shift ;;
         -v) VERBOSE="-v"; shift ;;
+        --no-ping) PING_ENABLED=0; shift ;;
         -h) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
 done
 
 # Setup sshpass prefix if password was provided
+STRESS_ARGS=""
+if [ -n "$STRESS_DELAY" ]; then
+    STRESS_ARGS="$STRESS_ARGS -d $STRESS_DELAY"
+fi
+if [ -n "$STRESS_SIZE" ]; then
+    STRESS_ARGS="$STRESS_ARGS -b $STRESS_SIZE"
+fi
 SSH_PASS_CMD=""
 if [ -n "$SSH_PASS" ]; then
     if command -v sshpass >/dev/null 2>&1; then
@@ -120,6 +140,63 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
+
+# Ping sanity check against the SoC.
+# Pre-run: informational. Post-run: a hard gate (report, do not fix).
+run_ping() {
+    [ "$PING_ENABLED" = "1" ] || return 0
+    local label="$1"
+    local out recv rtt max_rtt=0 ooo=0 count=0
+    out=$(ping -n -c 10 -W 1 "$SOC_IP" 2>&1)
+    recv=$(printf '%s\n' "$out" | awk '/received/{print $4}')
+    [ -z "$recv" ] && recv=0
+    # parse per-reply RTT, detect out-of-order icmp_seq
+    printf '%s\n' "$out" | awk '
+        /bytes from/{
+            seq++; cur=$0
+            if (match(cur, /icmp_seq=[0-9]+/)) {
+                v=substr(cur, RSTART+9, RLENGTH-9)+0
+                if (seen) { if (v < prev) ooo++; }
+                prev=v; seen=1
+            }
+            if (match(cur, /time=[0-9.]+/))
+                rtt=substr(cur, RSTART+5, RLENGTH-5)+0
+            if (rtt > max) max=rtt
+        }
+        END{ print ooo" "max }
+    ' | read ooo max_rtt || { ooo=0; max_rtt=0; }
+
+    echo "  Ping ($label): $recv/10 replies, max RTT ${max_rtt}ms, OOO=$ooo"
+    case "$label" in
+        before)
+            if [ "$recv" = "0" ]; then
+                echo "  WARNING: SoC not reachable via ping before test."
+                echo "           Validation will likely fail. (use --no-ping to skip)"
+            fi
+            return 0
+            ;;
+        after)
+            local pass=1
+            [ "$recv" != "10" ] && pass=0
+            if [ "$max_rtt" != "0" ] && [ "$max_rtt" -ge 500 ]; then pass=0; fi
+            [ "$ooo" != "0" ] && pass=0
+            if [ "$pass" = "1" ]; then
+                echo "  Ping gate (after): PASS"
+                return 0
+            else
+                echo "  Ping gate (after): FAIL (connectivity degraded: $recv/10, maxRTT=${max_rtt}ms, OOO=$ooo)"
+                return 1
+            fi
+            ;;
+    esac
+    return 0
+}
+
+# Step 0: pre-run ping baseline
+echo ""
+echo "Pre-run ping baseline..."
+run_ping before
+echo ""
 
 # Step 1: Build if source exists and binary is older
 if [ -f "$SCRIPT_DIR/iob_eth_test.c" ] && [ ! -f "$TEST_BIN" ]; then
@@ -187,7 +264,7 @@ echo "-------------------------------------------"
 if [ -n "$SSH_USER" ]; then
     # Run remotely
     $SSH_PASS_CMD ssh $SSH_OPTS "${SSH_USER}@${SOC_IP}" \
-        "/tmp/iob_eth_test -s $SOC_IP -c $HOST_IP -v" 2>&1
+        "/tmp/iob_eth_test -s $SOC_IP -c $HOST_IP -v $STRESS_ARGS" 2>&1
     TEST_EXIT=$?
 else
     # Run locally (assume we're on the SoC or have access)
@@ -196,7 +273,7 @@ else
         TEST_EXIT=$?
     else
         echo "Test binary not found. Please run manually on the SoC:"
-        echo "  $TEST_BIN -s $SOC_IP -c $HOST_IP $VERBOSE"
+        echo "  $TEST_BIN -s $SOC_IP -c $HOST_IP $STRESS_ARGS $VERBOSE"
         echo ""
         echo "Press Enter when the test is complete, or Ctrl+C to abort."
         read -r
@@ -254,13 +331,45 @@ fi
 
 echo ""
 
-# Step 8: Final verdict
+# Step 8: Post-run connectivity / ping gate (report, do not fix)
+echo "Post-run ping gate..."
+run_ping after
+PING_GATE=$?
+echo ""
+
+# Step 8b: Optional down/up wedge characterization
+run_downup() {
+    [ "$RUN_DOWNUP" = "1" ] || return 0
+    echo "Characterizing down/up recovery after the run (wedge repro):"
+    if [ -n "$SSH_USER" ]; then
+        $SSH_PASS_CMD ssh $SSH_OPTS "${SSH_USER}@${SOC_IP}" \
+            "iface=\$(ls /sys/class/net/ | grep -v lo | head -n1); \
+             ip link set \$iface down; sleep 1; ip link set \$iface up; sleep 2; \
+             ip -brief addr show \$iface" 2>&1
+    else
+        echo "  (no -S given; recycle the SoC link manually)"
+    fi
+    echo "  Ping $SOC_IP after down/up (per-reply latency):"
+    ping -n -c 10 -W 2 "$SOC_IP" 2>&1 | \
+        awk '/bytes from/{print "    " ++n":\t"$0}'
+    echo "  done."
+    return 0
+}
+run_downup
+echo ""
+
+# Step 9: Final verdict
 echo "============================================"
 
-if [ $TEST_EXIT -eq 0 ]; then
+if [ $TEST_EXIT -eq 0 ] && [ $PING_GATE -eq 0 ]; then
     echo "OVERALL VALIDATION: PASS"
 else
     echo "OVERALL VALIDATION: FAIL"
+    if [ $PING_GATE -ne 0 ]; then
+        echo "  Cause: post-test connectivity gate failed (ping lost to $SOC_IP)"
+    fi
+    # A failed ping gate dominates, even if the exit code was 0.
+    [ $TEST_EXIT -eq 0 ] && TEST_EXIT=1
 fi
 
 exit $TEST_EXIT
