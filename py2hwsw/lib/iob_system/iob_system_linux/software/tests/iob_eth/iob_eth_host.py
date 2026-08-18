@@ -136,12 +136,18 @@ def handle_stress_tx(data, sock, soc_addr):
 def handle_stress_rx(data, sock, soc_addr):
     """
     SoC wants us to send a burst of frames.
-    Payload: count(2) + size(2).
+    Payload: count(2) + size(2) + delay(2) [delay in ms, 0 = back-to-back].
+    Backward compatible: if only 4 bytes are given, default to a 10ms gap.
     """
     count = (data[0] << 8) | data[1]
     size = (data[2] << 8) | data[3]
+    if len(data) >= 6:
+        delay_ms = (data[4] << 8) | data[5]
+    else:
+        delay_ms = 10
 
-    log(f"Stress RX: sending {count} frames of {size} bytes")
+    log(f"Stress RX: sending {count} frames of {size} bytes "
+        f"({delay_ms} ms gap)")
 
     # Build the packet header for echo frames
     pkt = bytearray(HDR_SIZE + size)
@@ -162,7 +168,8 @@ def handle_stress_rx(data, sock, soc_addr):
             log(f"Send error at frame {i}: {e}")
             stats["errors"] += 1
             break
-        time.sleep(0.01)  # 10ms delay for SoC to drain RX ring
+        if delay_ms:
+            time.sleep(delay_ms / 1000.0)
 
     log(f"Stress RX: sent {count} frames")
     return b"\x42"
