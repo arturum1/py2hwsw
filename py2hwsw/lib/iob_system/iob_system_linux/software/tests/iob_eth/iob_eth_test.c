@@ -762,7 +762,7 @@ static uint32_t ether_crc32(const uint8_t *data, size_t len) {
   for (size_t i = 0; i < len; i++) {
     crc ^= data[i];
     for (int b = 0; b < 8; b++)
-      crc = (crc >> 1) ^ (CRC32_POLY & (uint32_t)-(int32_t)(crc & 1));
+      crc = (crc >> 1) ^ (CRC32_POLY & (uint32_t) - (int32_t)(crc & 1));
   }
   return bitrev32(crc);
 }
@@ -787,9 +787,9 @@ static int scan_dmesg_errors(void) {
   FILE *fp;
   char line[512];
   static const char *patterns[] = {
-      "wrong CRC",  "overrun",      "frame too long", "frame too short",
-      "late collision", "retransmit limit", "underrun", "dribble",
-      "carrier sense",
+      "wrong CRC",       "overrun",        "frame too long",
+      "frame too short", "late collision", "retransmit limit",
+      "underrun",        "dribble",        "carrier sense",
   };
   int count = 0;
   size_t npat = sizeof(patterns) / sizeof(patterns[0]);
@@ -799,8 +799,8 @@ static int scan_dmesg_errors(void) {
     return -1;
 
   while (fgets(line, sizeof(line), fp)) {
-    int iface_match = (strstr(line, g_iface) != NULL) ||
-                      (strstr(line, "ethoc") != NULL);
+    int iface_match =
+        (strstr(line, g_iface) != NULL) || (strstr(line, "ethoc") != NULL);
     if (!iface_match)
       continue;
     for (size_t i = 0; i < npat; i++) {
@@ -826,7 +826,8 @@ static int report_dmesg_errors(const char *label, int baseline, int fatal) {
   }
   if (now > baseline) {
     if (fatal) {
-      TEST_FAIL(label, "ethoc reported %d RX/TX error(s) in dmesg (baseline %d)",
+      TEST_FAIL(label,
+                "ethoc reported %d RX/TX error(s) in dmesg (baseline %d)",
                 now - baseline, baseline);
       return 1;
     } else {
@@ -855,9 +856,9 @@ static int dmesg_snapshot(dmesg_snap *snap) {
   FILE *fp;
   char line[512];
   static const char *patterns[] = {
-      "wrong CRC",  "overrun",      "frame too long", "frame too short",
-      "late collision", "retransmit limit", "underrun", "dribble",
-      "carrier sense",
+      "wrong CRC",       "overrun",        "frame too long",
+      "frame too short", "late collision", "retransmit limit",
+      "underrun",        "dribble",        "carrier sense",
   };
   size_t npat = sizeof(patterns) / sizeof(patterns[0]);
   int n = 0;
@@ -867,8 +868,8 @@ static int dmesg_snapshot(dmesg_snap *snap) {
     return -1;
 
   while (n < DMESG_MAX && fgets(line, sizeof(line), fp)) {
-    int iface_match = (strstr(line, g_iface) != NULL) ||
-                      (strstr(line, "ethoc") != NULL);
+    int iface_match =
+        (strstr(line, g_iface) != NULL) || (strstr(line, "ethoc") != NULL);
     if (!iface_match)
       continue;
     for (size_t i = 0; i < npat; i++) {
@@ -2120,13 +2121,13 @@ static int test_ringparam_set(void) {
 
     errno = 0;
     if (set_ethtool_ring(fd, tgt_tx, tgt_rx) < 0) {
-      TEST_FAIL("Ring Set", "set_ringparam(%u,%u) failed: %s", tgt_tx,
-                tgt_rx, strerror(errno));
+      TEST_FAIL("Ring Set", "set_ringparam(%u,%u) failed: %s", tgt_tx, tgt_rx,
+                strerror(errno));
       ok = 0;
     } else if (get_ethtool_ring(fd, &ring) == 0) {
       if (ring.tx_pending != tgt_tx || ring.rx_pending != tgt_rx) {
-        TEST_FAIL("Ring Set", "after set(%u,%u): tx=%u rx=%u", tgt_tx,
-                  tgt_rx, ring.tx_pending, ring.rx_pending);
+        TEST_FAIL("Ring Set", "after set(%u,%u): tx=%u rx=%u", tgt_tx, tgt_rx,
+                  ring.tx_pending, ring.rx_pending);
         ok = 0;
       }
       if (get_ethtool_regs(fd, regs, &count) == 0 &&
@@ -2247,8 +2248,7 @@ static int test_ksettings(void) {
   }
 
   if (get_link_speed_duplex(fd, &speed, &duplex) < 0) {
-    TEST_FAIL("Link Settings", "get_link_settings failed: %s",
-              strerror(errno));
+    TEST_FAIL("Link Settings", "get_link_settings failed: %s", strerror(errno));
     close(fd);
     return -1;
   }
@@ -2651,7 +2651,7 @@ static int test_stress_rx(void) {
   int fd;
   struct net_stats stats_before, stats_after;
   uint16_t count = 200;
-  uint16_t size = g_stress_rx_size; /* default 1468; -b to sweep */
+  uint16_t size = g_stress_rx_size;   /* default 1468; -b to sweep */
   uint16_t delay = g_stress_rx_delay; /* 0 = back-to-back (default) */
   uint8_t payload[6];
   struct cmd_packet pkt;
@@ -2705,7 +2705,8 @@ static int test_stress_rx(void) {
   get_irq_count(&irq_after);
   close(fd);
 
-  /* liveness probe: if small 32B ECHO round-trips now, RX is not fully wedged */
+  /* liveness probe: if small 32B ECHO round-trips now, RX is not fully wedged
+   */
   {
     int pfd = create_test_socket(TEST_ETH_PORT);
     if (pfd >= 0) {
@@ -2732,10 +2733,11 @@ static int test_stress_rx(void) {
 
     if (received < count) {
       if (burst) {
-        TEST_INFO("Stress RX",
-                  "Only received %d/%d frames under line-rate burst (known "
-                  "limitation: 50 MHz SoC cannot sustain 100 Mbps back-to-back)",
-                  received, count);
+        TEST_INFO(
+            "Stress RX",
+            "Only received %d/%d frames under line-rate burst (known "
+            "limitation: 50 MHz SoC cannot sustain 100 Mbps back-to-back)",
+            received, count);
       } else {
         TEST_FAIL("Stress RX", "Only received %d/%d frames under burst",
                   received, count);
@@ -2743,8 +2745,10 @@ static int test_stress_rx(void) {
       }
     }
     if (stats_after.rx_errors > stats_before.rx_errors) {
-      TEST_FAIL("Stress RX", "rx_errors aggregate increased (+%lu); see dmesg "
-               "for sub-counter (overrun/CRC) detail", rxerr);
+      TEST_FAIL("Stress RX",
+                "rx_errors aggregate increased (+%lu); see dmesg "
+                "for sub-counter (overrun/CRC) detail",
+                rxerr);
       ok = 0;
     }
   }
@@ -2990,7 +2994,8 @@ static int test_final_summary(void) {
       if (g_burst_info) {
         TEST_INFO("dmesg",
                   "%d ethoc RX/TX error line(s) in kernel log (line-rate "
-                  "Stress RX burst; known limitation on 50 MHz SoC)", now);
+                  "Stress RX burst; known limitation on 50 MHz SoC)",
+                  now);
       } else {
         TEST_FAIL("dmesg", "%d ethoc RX/TX error line(s) in kernel log", now);
         gate_ok = 0;

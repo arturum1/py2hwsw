@@ -146,8 +146,7 @@ def handle_stress_rx(data, sock, soc_addr):
     else:
         delay_ms = 10
 
-    log(f"Stress RX: sending {count} frames of {size} bytes "
-        f"({delay_ms} ms gap)")
+    log(f"Stress RX: sending {count} frames of {size} bytes " f"({delay_ms} ms gap)")
 
     # Build the packet header for echo frames
     pkt = bytearray(HDR_SIZE + size)
