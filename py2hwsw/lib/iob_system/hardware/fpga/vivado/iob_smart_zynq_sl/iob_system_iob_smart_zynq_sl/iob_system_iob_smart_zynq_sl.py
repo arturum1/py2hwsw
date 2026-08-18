@@ -493,8 +493,6 @@ def setup(py_params_dict):
 
     assign uut_mii_crs = 1'b0;
     assign uut_mii_col = 1'b0;
-
-    assign phy_rstn = ~arst; // PHY reset
 """
 
     attributes_dict["snippets"] = [{"verilog_code": verilog_snippet}]
