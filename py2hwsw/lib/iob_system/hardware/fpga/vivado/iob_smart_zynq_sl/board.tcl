@@ -82,6 +82,7 @@ if { $USE_EXTMEM > 0 } {
 if { $USE_ETHERNET > 0 } {
     read_verilog vivado/$BOARD/iob_xilinx_ibufg.v
     read_verilog vivado/$BOARD/iob_xilinx_oddr.v
+    read_verilog vivado/$BOARD/iob_xilinx_iddr.v
 
     if {[file exists "vivado/$BOARD/iob_eth_dev.sdc"]} {
         read_xdc vivado/$BOARD/iob_eth_dev.sdc

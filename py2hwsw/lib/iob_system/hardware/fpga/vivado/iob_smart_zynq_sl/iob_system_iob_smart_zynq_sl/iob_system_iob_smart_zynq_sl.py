@@ -247,10 +247,25 @@ def setup(py_params_dict):
                     {"name": "uut_mii_rx_er", "width": "1"},
                     {"name": "uut_mii_crs", "width": "1"},
                     {"name": "uut_mii_col", "width": "1"},
-                    {
-                        "name": "rgmii_mdio_io"
-                    },  # Don't create internal wire 'uut_mii_mdio', because we cant assign bidirectional signals in verilog. Use rgmii_mdio_io signal directly.
+                    # Don't create internal wire 'uut_mii_mdio', because we cant assign bidirectional signals in verilog. Use rgmii_mdio_io signal directly.
+                    {"name": "rgmii_mdio_io"},
                     {"name": "uut_mii_mdc", "width": "1"},
+                ],
+            },
+            {
+                "name": "rgmii_ddr_conversion",
+                "descr": "RGMII DDR conversion",
+                "signals": [
+                    {"name": "rxd_rising_0", "width": 1},
+                    {"name": "rxd_falling_0", "width": 1},
+                    {"name": "rxd_rising_1", "width": 1},
+                    {"name": "rxd_falling_1", "width": 1},
+                    {"name": "rxd_rising_2", "width": 1},
+                    {"name": "rxd_falling_2", "width": 1},
+                    {"name": "rxd_rising_3", "width": 1},
+                    {"name": "rxd_falling_3", "width": 1},
+                    {"name": "rx_dv_rising", "width": 1},
+                    {"name": "rx_dv_falling", "width": 1},
                 ],
             },
         ]
@@ -291,12 +306,16 @@ def setup(py_params_dict):
                     "io_io": "rxclk_buf_io",
                 },
             },
-            {
+            {  # Also instantiated in verilog snippet
                 "core_name": "iob_xilinx_oddr",
                 "instance_name": "txclk_oddr",
                 "connect": {
                     "io_io": "oddr_io",
                 },
+            },
+            {  # Instantiated in verilog snippet
+                "core_name": "iob_xilinx_iddr",
+                "instantiate": False,
             },
         ]
     if params["use_extmem"]:
@@ -481,13 +500,24 @@ def setup(py_params_dict):
     assign uut_mii_rx_clk = eth_clk;
     assign uut_mii_tx_clk = eth_clk;
 
-    // Connect internal MII data/control to external RGMII ports
-    assign uut_mii_rxd = rgmii_rxd_i;
-    assign uut_mii_rx_dv = rgmii_rx_dv_i;
-    assign uut_mii_rx_er = rgmii_rx_er_i;
+    // RGMII RX: DDR capture on all 4 data lines
+    // Same nibble on both edges; IDDR captures both, Q1 (rising) feeds MAC
+    iob_xilinx_iddr iddr_rxd0 (.clk_i(eth_clk), .d_i(rgmii_rxd_i[0]), .q1_o(rxd_rising_0), .q2_o(rxd_falling_0));
+    iob_xilinx_iddr iddr_rxd1 (.clk_i(eth_clk), .d_i(rgmii_rxd_i[1]), .q1_o(rxd_rising_1), .q2_o(rxd_falling_1));
+    iob_xilinx_iddr iddr_rxd2 (.clk_i(eth_clk), .d_i(rgmii_rxd_i[2]), .q1_o(rxd_rising_2), .q2_o(rxd_falling_2));
+    iob_xilinx_iddr iddr_rxd3 (.clk_i(eth_clk), .d_i(rgmii_rxd_i[3]), .q1_o(rxd_rising_3), .q2_o(rxd_falling_3));
+    iob_xilinx_iddr iddr_rxdv (.clk_i(eth_clk), .d_i(rgmii_rx_dv_i), .q1_o(rx_dv_rising), .q2_o(rx_dv_falling));
+    // Feed rising-edge sample (valid MII nibble) to MAC
+    assign uut_mii_rxd = {rxd_rising_3, rxd_rising_2, rxd_rising_1, rxd_rising_0};
+    assign uut_mii_rx_dv = rx_dv_rising;
+    assign uut_mii_rx_er = 1'b0;
 
-    assign rgmii_txd_o = uut_mii_txd;
-    assign rgmii_tx_en_o = uut_mii_tx_en;
+    // RGMII TX: duplicate MII nibble on both DDR edges
+    iob_xilinx_oddr oddr_txd0 (.clk_i(eth_clk), .d1_i(uut_mii_txd[0]), .d2_i(uut_mii_txd[0]), .q_o(rgmii_txd_o[0]));
+    iob_xilinx_oddr oddr_txd1 (.clk_i(eth_clk), .d1_i(uut_mii_txd[1]), .d2_i(uut_mii_txd[1]), .q_o(rgmii_txd_o[1]));
+    iob_xilinx_oddr oddr_txd2 (.clk_i(eth_clk), .d1_i(uut_mii_txd[2]), .d2_i(uut_mii_txd[2]), .q_o(rgmii_txd_o[2]));
+    iob_xilinx_oddr oddr_txd3 (.clk_i(eth_clk), .d1_i(uut_mii_txd[3]), .d2_i(uut_mii_txd[3]), .q_o(rgmii_txd_o[3]));
+    iob_xilinx_oddr oddr_txen (.clk_i(eth_clk), .d1_i(uut_mii_tx_en), .d2_i(uut_mii_tx_en), .q_o(rgmii_tx_en_o));
 
     assign rgmii_mdc_o = uut_mii_mdc;
 
