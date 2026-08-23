@@ -69,6 +69,7 @@ def setup(py_params: dict):
     update_params(params, py_params)
 
     sw_trap_fenci = True
+    sw_cbo = False
 
     if params["cpu"] == "none":
         params["use_intmem"] = False
@@ -78,6 +79,10 @@ def setup(py_params: dict):
     # Disable software trap handler and fence.i for uncompatible CPUs
     if params["cpu"] == "iob_picorv32":
         sw_trap_fenci = False
+
+    # Enable software CBO instructions for compatible CPUs
+    if params["cpu"] == "iob_vexiiriscv":
+        sw_cbo = True
 
     num_xbar_managers = 0
     for param_name in ["use_intmem", "use_extmem", "use_bootrom", "use_peripherals"]:
@@ -207,6 +212,14 @@ def setup(py_params: dict):
                 "descr": "Enable 'FENCE.I' instruction from the RISC-V 'Zifencei' extension. Only enable this for compatible CPUs. PicoRV32 not compatible.",
                 "type": "M",
                 "val": sw_trap_fenci,
+                "min": "0",
+                "max": "1",
+            },
+            {  # Needed for software
+                "name": "CBO",
+                "descr": "Enable 'CBO' (Cache-Block Option) instructions from the RISC-V 'Zicbom' Extension. Only enable this for compatible CPUs. PicoRV32, Vexriscv not compatible.",
+                "type": "M",
+                "val": sw_cbo,
                 "min": "0",
                 "max": "1",
             },

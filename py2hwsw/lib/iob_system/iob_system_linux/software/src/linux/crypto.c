@@ -46,9 +46,7 @@ void nist_kat_init(unsigned char *entropy_input,
 // Clean and invalidate CPU data cache. Write-back dirty lines to memory and
 // then discard cache contents.
 void flush_cache(void *start, size_t len) {
-  // Vexriscv specific instruction to invalidate CPU data cache (discards dirty
-  // lines) asm volatile(".word 0x500F" ::: "memory");
-
+#ifdef IOB_SYSTEM_LINUX_CBO
   char *end = (char *)start + len;
   char *ptr;
 
@@ -60,6 +58,13 @@ void flush_cache(void *start, size_t len) {
     asm volatile("cbo.flush 0(%0)" ::"r"(ptr) : "memory");
     ptr += CACHE_LINE_SIZE;
   }
+#else  // NOT IOB_SYSTEM_LINUX_CBO
+  // Delay to ensure all data is written to memory
+  for (unsigned int i = 0; i < 10; i++)
+    asm volatile("nop");
+  // Flush VexRiscv CPU internal cache
+  asm volatile(".word 0x500F" ::: "memory");
+#endif // IOB_SYSTEM_LINUX_CBO
 }
 
 static char HexToInt(char ch) {

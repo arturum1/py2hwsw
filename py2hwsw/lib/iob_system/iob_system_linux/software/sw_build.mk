@@ -184,7 +184,7 @@ TEMPLATE_LDS=src/$@.lds
 #
 ## Compiler FLAGS with custom architecture, including atomic instructions
 #IOB_SYSTEM_LINUX_CFLAGS ?=-Os -nostdlib -march=rv32imac_zicsr_zifencei_zicbom -mabi=ilp32 --specs=nano.specs -Wcast-align=strict $(SIM_DEFINE)
-IOB_SYSTEM_LINUX_CFLAGS ?=-Os -nostdlib -march=rv32imac_zicsr_zifencei_zicbom -mabi=ilp32 --specs=nano.specs -Wcast-align=strict
+#IOB_SYSTEM_LINUX_CFLAGS ?=-Os -nostdlib -march=rv32imac_zicsr_zifencei_zicbom -mabi=ilp32 --specs=nano.specs -Wcast-align=strict
 
 IOB_SYSTEM_LINUX_INCLUDES=-Isrc
 #IOB_SYSTEM_LINUX_INCLUDES=-Isrc -Isrc/crypto/McEliece -Isrc/crypto/McEliece/common
