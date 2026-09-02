@@ -32,7 +32,7 @@ def setup(py_params: dict):
         "mem_addr_w": 26,
         "bootrom_addr_w": 16,
         "fw_baseaddr": 0,
-        "cpu": "iob_vexriscv",
+        "cpu": "iob_cva6",
         "include_snippet": False,  # Don't include iob_system's snippets. We will use our own.
     }
     iob_system_default_overrides |= {
@@ -372,6 +372,7 @@ def setup(py_params: dict):
         dts_parameters = {
             "name": py_params.get("name", "iob_system_linux"),
             "build_dir": py_params["build_dir"],
+            "cpu": py_params.get("cpu", "iob_vexriscv"),
             "hardcoded_plic_cint": False,
             "bootargs": "rootwait console=ttyS0,115200 earlycon=sbi root=/dev/ram0 init=/sbin/init swiotlb=32 loglevel=8",
         }

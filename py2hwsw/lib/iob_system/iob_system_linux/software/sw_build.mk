@@ -159,6 +159,7 @@ compile_device_tree: linux_build_macros.txt peripherals.dtsi
 	nix-shell $(OS_DIR)/default.nix --run 'make -C $(OS_DIR) build-dts MACROS_FILE=$(REL_OS2ROOT)/software/linux_build_macros.txt DTS_FILE=$(REL_OS2ROOT)/software/iob_system_linux.dts'
 
 compile_opensbi:
+	$(if $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,MSTATUSH),,$(ROOT_DIR)/scripts/patch_opensbi.sh)
 	nix-shell $(OS_DIR)/default.nix --run 'make -C $(OS_DIR) build-opensbi MACROS_FILE=$(REL_OS2ROOT)/software/linux_build_macros.txt OPENSBI_PLATFORM_DIR=$(REL_OS2ROOT)/software/opensbi_platform/iob_system_linux'
 
 .PHONY: compile_device_tree compile_opensbi
