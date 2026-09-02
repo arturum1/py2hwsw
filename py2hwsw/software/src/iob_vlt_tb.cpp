@@ -37,6 +37,9 @@ vluint64_t sim_time = 0;
 vluint64_t vcd_delayed_start = 0;
 #endif
 
+// Static flag to track if VCD dump has started after delay
+static bool dump_started = false;
+
 Viob_uut *dut = new Viob_uut; // Create instance of module
 
 int iob_core_tb();
@@ -46,13 +49,25 @@ void clk_tick(unsigned int n = 1) {
   for (unsigned int i = 0; i < n; i++) {
     dut->eval();
 #if (VM_TRACE == 1)
-    tfp->dump(sim_time); // Dump values into tracing file
+    bool start_dumping = (vcd_delayed_start == 0) || (sim_time >= vcd_delayed_start);
+    if (start_dumping) {
+      tfp->dump(sim_time); // Dump values into tracing file
+      if (!dump_started) {
+        fprintf(stderr, "Starting VCD dump at time %lu ns (delay: %lu ns)\n", (unsigned long)sim_time, (unsigned long)vcd_delayed_start);
+        dump_started = true;
+      }
+    }
 #endif
     sim_time += CLK_PERIOD / 2;
     dut->clk_i = !dut->clk_i; // negedge
     dut->eval();
 #if (VM_TRACE == 1)
-    tfp->dump(sim_time);
+    if (start_dumping) {
+      tfp->dump(sim_time);
+      if (dump_started && (sim_time % 1000000000 == 0)) {
+        fprintf(stderr, "VCD dump running at time %lu ns\n", (unsigned long)sim_time);
+      }
+    }
 #endif
     sim_time += CLK_PERIOD / 2;
     dut->clk_i = !dut->clk_i; // posedge
