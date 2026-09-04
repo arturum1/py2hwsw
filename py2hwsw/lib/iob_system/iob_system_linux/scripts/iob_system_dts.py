@@ -79,7 +79,7 @@ def generate_dts(dts_parameters):
         extra_cpu_props = ""
         bus_dma_prop = ""
         # FIXME: AN: I think vexriscv is also noncoherent with DMA peripherals since it has a data cache that must be invalidated to ensure peripehral DMA data is read correctly.
-        #bus_dma_prop = "        dma-noncoherent; // tells Linux that every peripheral of this bus using DMA need explicit cache flushes\n"
+        # bus_dma_prop = "        dma-noncoherent; // tells Linux that every peripheral of this bus using DMA need explicit cache flushes\n"
 
     # Generate DTS file
     dts = f"""

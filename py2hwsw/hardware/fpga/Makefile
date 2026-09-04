@@ -46,6 +46,11 @@ VSRC += $(wildcard ../src/*.v) $(wildcard ./src/*.v)
 VHDR += $(wildcard ../common_src/*.vh)
 VSRC += $(wildcard ../common_src/*.v)
 
+VHDR += $(wildcard ../src/*.svh) $(wildcard ./src/*.svh)
+VSRC += $(wildcard ../src/*.sv) $(wildcard ./src/*.sv)
+VHDR += $(wildcard ../common_src/*.svh)
+VSRC += $(wildcard ../common_src/*.sv)
+
 ifneq ($(wildcard $(FPGA_TOOL)/$(BOARD)/$(FPGA_TOP).v),)
 VSRC+=$(FPGA_TOOL)/$(BOARD)/$(FPGA_TOP).v
 endif

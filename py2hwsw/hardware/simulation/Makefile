@@ -27,6 +27,10 @@ VHDR+=$(wildcard ../src/*.vh)
 VSRC+=$(wildcard ../src/*.v)
 VHDR+=$(wildcard ../common_src/*.vh)
 VSRC+=$(wildcard ../common_src/*.v)
+VHDR+=$(wildcard ../src/*.svh)
+VSRC+=$(wildcard ../src/*.sv)
+VHDR+=$(wildcard ../common_src/*.svh)
+VSRC+=$(wildcard ../common_src/*.sv)
 else
 NODE ?= umc130
 include ../syn/$(NODE)/sim.mk
