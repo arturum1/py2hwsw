@@ -69,19 +69,20 @@ ifeq ($(RUN_LINUX),1)
 OS_DIR = $(ROOT_DIR)/submodules/iob_linux
 # Relative path from OS directory to Root directory
 REL_OS2ROOT :=`realpath $(ROOT_DIR) --relative-to=$(OS_DIR)`
-OPENSBI_DIR = fw_jump.bin
+# Ibex CPU: no S-mode / MMU. Skip OpenSBI and boot Linux kernel directly in M-mode.
+# OpenSBI (fw_jump.bin) is not built nor loaded.
+OPENSBI_DIR =
 DTB_DIR = iob_system_linux.dtb
 DTB_ADDR:=00F80000
 LINUX_DIR = Image
 LINUX_ADDR:=00400000
 ROOTFS_DIR = rootfs.cpio.gz
 ROOTFS_ADDR:=01000000
-FIRM_ARGS = $(OPENSBI_DIR)
-FIRM_ARGS += $(DTB_DIR) $(DTB_ADDR)
+FIRM_ARGS = $(DTB_DIR) $(DTB_ADDR)
 FIRM_ARGS += $(LINUX_DIR) $(LINUX_ADDR)
 FIRM_ARGS += $(ROOTFS_DIR) $(ROOTFS_ADDR)
-UTARGETS += compile_device_tree compile_opensbi
-FIRMWARE := fw_jump.bin iob_system_linux.dtb Image rootfs.cpio.gz
+UTARGETS += compile_device_tree
+FIRMWARE := iob_system_linux.dtb Image rootfs.cpio.gz
 # Set simulation/FPGA board grab timeout to 1 hour
 GRAB_TIMEOUT ?= 3600
 else
@@ -102,7 +103,11 @@ iob_system_linux_firmware.bin: ../../software/iob_system_linux_firmware.bin
 
 
 # Linux specific targets
-fw_jump.bin iob_system_linux.dtb:
+# Ibex has no S-mode / MMU; OpenSBI (fw_jump.bin) is not used.
+fw_jump.bin:
+	@echo "OpenSBI not built: Ibex CPU has no S-mode / MMU. Skipping $@."
+
+iob_system_linux.dtb:
 	cp $(OS_DIR)/software/OS_build/$@ .
 
 Image rootfs.cpio.gz:

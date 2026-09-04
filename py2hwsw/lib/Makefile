@@ -179,16 +179,6 @@ release-artifacts:
 # Regenerate timer userspace driver binaries and recompile buildroot of iob_system_linux
 LINUX_SUBMODULE_DIR=iob_system/iob_system_linux/submodules/iob_linux
 buildroot-update:
-	# Generate $(CORE)
-	make clean setup CORE=$(CORE) BUILD_DIR=$(BUILD_DIR)
-	# Compile userspace binaries
-	nix-shell $(LINUX_SUBMODULE_DIR) --run 'make -C $(BUILD_DIR)/software/linux/user all'
-	# Copy userspace driver binaries to iob_system_linux buildroot
-	for file in "$(CORE)_user_sysfs" "$(CORE)_user_dev" "$(CORE)_user_ioctl" "$(CORE)_tests_sysfs" "$(CORE)_tests_dev" "$(CORE)_tests_ioctl"; do\
-		cp $(BUILD_DIR)/software/linux/user/$$file iob_system/iob_system_linux/software/buildroot/board/IObundle/iob-soc/rootfs-overlay/root/;\
-	done
-	# Compile kernel driver (along with Linux kernel) and place it in iob_system_linux buildroot
-	nix-shell $(LINUX_SUBMODULE_DIR) --run 'make -C $(LINUX_SUBMODULE_DIR) build-linux-drivers MODULE_NAME=$(CORE) MODULE_DRIVER_DIR=../../../../$(BUILD_DIR)/software/linux/drivers ROOTFS_OVERLAY_DIR=../../software/buildroot/board/IObundle/iob-soc/rootfs-overlay/drivers'
 	# Copy iob_system_linux buildroot to iob_linux
 	cp -r iob_system/iob_system_linux/software/buildroot/* $(LINUX_SUBMODULE_DIR)/software/buildroot/;
 	# Recompile buildroot
@@ -205,10 +195,6 @@ endif
 linux-kernel:
 	# Copy defconfig (linux_config) from iob_system_linux to iob_linux
 	cp iob_system/iob_system_linux/software/linux_config $(LINUX_SUBMODULE_DIR)/software/linux_config
-	# Run target to create linux directory (so that we can modify its sources)
-	nix-shell $(LINUX_SUBMODULE_DIR) --run 'make -C $(LINUX_SUBMODULE_DIR) clean-linux-kernel $(CURDIR)/$(LINUX_SUBMODULE_DIR)/submodules/linux-5.15.98'
-	# Copy custom ethoc driver to kernel source folder
-	cp iob_system/submodules/iob_eth/software/linux/ethoc.c $(LINUX_SUBMODULE_DIR)/submodules/linux-5.15.98/drivers/net/ethernet/ethoc.c
 	# Build Linux kernel
 	nix-shell $(LINUX_SUBMODULE_DIR) --run 'make -C $(LINUX_SUBMODULE_DIR) build-linux-kernel'
 	# Copy built Linux kernel to iob_system_linux
