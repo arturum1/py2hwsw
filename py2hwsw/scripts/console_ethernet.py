@@ -67,7 +67,16 @@ def cnsl_sendfile_ethernet():
     # receive file name
     name = cnsl_recvstr()
 
-    file_size = os.path.getsize(name)
+    # If file is missing, send a 0-byte file so the bootloader can detect
+    # "no value" via recvfile() returning 0.
+    try:
+        file_size = os.path.getsize(name)
+        send_data = True
+    except FileNotFoundError:
+        print(PROGNAME, end="")
+        print(": file {0} not found, sending empty payload".format(name))
+        file_size = 0
+        send_data = False
 
     print(PROGNAME, end="")
     print(": file of size {0} bytes".format(file_size))
@@ -81,8 +90,11 @@ def cnsl_sendfile_ethernet():
             pass
 
     # Send Data File
-    SyncAckFirst(socket)
-    SendFile(socket, name)
+    if send_data:
+        SyncAckFirst(socket)
+        SendFile(socket, name)
+    else:
+        SyncAckFirst(socket)
 
     print(PROGNAME, end="")
     print(": file sent")

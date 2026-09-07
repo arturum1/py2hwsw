@@ -9,6 +9,8 @@ This script checks if the SoC is running linux or not.
 It will create the "<soc_name>_mem.config" file that specifies which binaries and addresses to load to RAM when INIT_MEM=0.
 If running baremetal firmware, the config file will only specify the firmware file and its load address.
 If running linux, the config file will specify the bootloader, linux kernel, dtb and rootfs.
+
+Pass --no-opensbi to skip OpenSBI in the linux flow (e.g. for Ibex / M-mode boot).
 """
 
 import sys
@@ -20,6 +22,9 @@ if len(sys.argv) > 4:
     RUN_LINUX = sys.argv[4]
 else:
     RUN_LINUX = "0"
+
+# Detect --no-opensbi flag (may appear anywhere in argv)
+USE_OPENSBI = "--no-opensbi" not in sys.argv
 
 
 # If line contains "line_content", replace entire line with "new_line_content"
@@ -43,9 +48,16 @@ def replace_line(filename, line_content, new_line_content):
 iob_mem_file = f"{ROOT_DIR}/hardware/{SOC_NAME}_mem.config"
 with open(iob_mem_file, "w") as file:
     if RUN_LINUX == "1":
-        file.write(
-            f"fw_jump.bin 0\nImage 400000\n{SOC_NAME}.dtb F80000\nrootfs.cpio.gz 1000000"
-        )
+        if USE_OPENSBI:
+            # Original flow: OpenSBI jumps to the Linux kernel.
+            file.write(
+                f"fw_jump.bin 0\nImage 400000\n{SOC_NAME}.dtb F80000\nrootfs.cpio.gz 1000000"
+            )
+        else:
+            # M-mode / no-MMU flow: boot Linux kernel directly (no OpenSBI).
+            # The kernel Image is loaded at offset 0x400000 (matches the
+            # kernel's link address). DTB and rootfs follow at higher offsets.
+            file.write(f"Image 400000\n{SOC_NAME}.dtb F80000\nrootfs.cpio.gz 1000000")
     else:
         file.write(f"{SOC_NAME}_firmware.bin {FW_BASE_ADDR}")
 

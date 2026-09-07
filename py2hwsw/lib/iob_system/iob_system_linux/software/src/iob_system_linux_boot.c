@@ -23,6 +23,58 @@
 
 #define DC1 17 // Device Control 1 (used to indicate end of bootloader)
 
+//
+// Newlib syscalls
+//
+// The bootloader is linked with `-lnosys`, which provides weak stub
+// implementations of the POSIX syscalls referenced by newlib's stdio layer
+// (e.g. via iob_printf). The `-lnosys` stubs trigger linker warnings
+// ("_close is not implemented and will always fail", etc.). Provide our own
+// weak stubs here so the linker resolves the references silently and the
+// bootloader keeps working even if some stdio path is exercised.
+//
+
+#include <reent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+__attribute__((weak)) int _close(int fd) {
+  (void)fd;
+  return -1;
+}
+
+__attribute__((weak)) int _fstat(int fd, struct stat *st) {
+  (void)fd;
+  (void)st;
+  return -1;
+}
+
+__attribute__((weak)) int _isatty(int fd) {
+  (void)fd;
+  return 0;
+}
+
+__attribute__((weak)) int _lseek(int fd, int ptr, int dir) {
+  (void)fd;
+  (void)ptr;
+  (void)dir;
+  return 0;
+}
+
+__attribute__((weak)) int _read(int fd, char *buf, int len) {
+  (void)fd;
+  (void)buf;
+  (void)len;
+  return 0;
+}
+
+__attribute__((weak)) int _write(int fd, const char *buf, int len) {
+  (void)fd;
+  (void)buf;
+  (void)len;
+  return len;
+}
+
 #define FLASH_FILE_SIZE_OFFSET 0x0   // sector 0, subsector 0
 #define FLASH_FIRMWARE_OFFSET 0x1000 // sector 0, subsector 1
 
@@ -85,6 +137,45 @@ uint32_t uart_recvfile_ethernet(char *file_name) {
 //
 // Memory loading
 //
+
+// Runtime-configurable jump address and DTB address used by boot.S.
+// Populated from a host-sent text file (e.g. "next_boot_addr") so the
+// bootloader no longer bakes the jump target into the FPGA bitstream.
+extern uint32_t next_boot_addr;
+extern uint32_t next_boot_dtb_addr;
+
+// Parse a hex string (e.g. "00400000\n" or "0x400000\n") into a 32-bit value.
+// Returns 0 on success and writes the value to *out. Returns -1 on parse
+// error (no hex digits found, buffer too large, or out-of-range value).
+static int parse_hex_addr(const char *buf, uint32_t size, uint32_t *out) {
+  uint32_t value = 0;
+  int i = 0;
+  int digits = 0;
+  // Skip optional "0x" or "0X" prefix
+  if (size >= 2 && buf[0] == '0' && (buf[1] == 'x' || buf[1] == 'X')) {
+    i = 2;
+  }
+  for (; i < (int)size; i++) {
+    char c = buf[i];
+    int digit;
+    if (c >= '0' && c <= '9')
+      digit = c - '0';
+    else if (c >= 'a' && c <= 'f')
+      digit = 10 + c - 'a';
+    else if (c >= 'A' && c <= 'F')
+      digit = 10 + c - 'A';
+    else
+      break; // stop on newline or any non-hex char
+    value = (value << 4) | (uint32_t)digit;
+    digits++;
+    if (digits > 8)
+      return -1; // would overflow 32 bits
+  }
+  if (digits == 0)
+    return -1;
+  *out = value;
+  return 0;
+}
 
 int compute_mem_load_txt(char file_name_array[4][50],
                          long int file_address_array[4], char *file_start_addr,
@@ -376,6 +467,43 @@ int main() {
   uart16550_putc((char)DC1);
 #endif
 #endif // INIT_MEM
+
+  // Receive runtime-configurable next-boot address and DTB address from the
+  // host. These are sent as small ASCII text files containing a hex value
+  // (e.g. "00400000\n"). If the host does not provide them, the defaults set
+  // in boot.S (next_boot_addr = IOB_SYSTEM_LINUX_FW_BASEADDR,
+  // next_boot_dtb_addr = 0x00F80000) are used. This runs in both INIT_MEM=0
+  // (console-loaded firmware) and INIT_MEM=1 (firmware baked into bitstream)
+  // cases so the jump target is always correct.
+  {
+    char addr_buf[32];
+    uint32_t parsed;
+    int n;
+
+    n = uart16550_recvfile("iob_system_linux_next_boot_addr", addr_buf);
+    if (n > 0 && n < (int)sizeof(addr_buf)) {
+      if (parse_hex_addr(addr_buf, (uint32_t)n, &parsed) == 0) {
+        next_boot_addr = parsed;
+        uart16550_puts(PROGNAME);
+        uart16550_puts(": next_boot_addr = 0x");
+        for (int j = 7; j >= 0; j--) {
+          int nib = (next_boot_addr >> (j * 4)) & 0xF;
+          uart16550_putc(nib < 10 ? '0' + nib : 'a' + nib - 10);
+        }
+        uart16550_puts("\n");
+      } else {
+        uart16550_puts(PROGNAME);
+        uart16550_puts(": invalid next_boot_addr payload, using default\n");
+      }
+    }
+
+    n = uart16550_recvfile("iob_system_linux_next_boot_dtb_addr", addr_buf);
+    if (n > 0 && n < (int)sizeof(addr_buf)) {
+      if (parse_hex_addr(addr_buf, (uint32_t)n, &parsed) == 0) {
+        next_boot_dtb_addr = parsed;
+      }
+    }
+  }
 
   // run firmware
   uart16550_puts(PROGNAME);

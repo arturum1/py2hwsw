@@ -11,8 +11,8 @@ import os
 
 def print_usage():
     usage_str = """
-Usage: ./makehex.py [--split] 1st_File 2nd_File 2nd_File_addr ... Firmware_Size output_file_name
-The first file is the main file and its address is 0.
+Usage: ./makehex.py [--split] 1st_File 1st_File_addr [2nd_File 2nd_File_addr ...] Firmware_Size output_file_name
+Each file must be followed by its load address (as a hex string).
 --split: Generate a separate hex file for each byte of memory words.
 """
     print(usage_str, file=sys.stderr)
@@ -39,28 +39,34 @@ def write_split_files(lines, output_file):
 
 
 def main():
+    import sys
+    args = sys.argv[:]
     split_words = False
-    if "--split" in argv:
+    if "--split" in args:
         split_words = True
-        argv.remove("--split")
+        args.remove("--split")
 
-    output_file = argv[-1]
-    argv.remove(output_file)
+    output_file = args[-1]
+    args.remove(output_file)
+    # Drop script name so args[0] is the first file
+    args = args[1:]
 
-    if len(argv) % 2 != 1:
-        print(f"Error: number of arguments must be odd. Got {len(argv)} arguments")
+    # Expected layout: [file1, addr1, file2, addr2, ..., fileN, addrN, mem_size]
+    # Total length = 2*nFiles + 1, always odd.
+    if len(args) % 2 != 1:
+        print(f"Error: number of arguments must be odd. Got {len(args)} arguments")
         print_usage()
         exit(1)
-    nFiles = int((len(argv) - 3) / 2) + 1
-    mem_size = 2 ** (int(argv[-1]))
-    binfile = [argv[1]]
-    binaddr = [0]
+    nFiles = int((len(args) - 1) / 2)
+    mem_size = 2 ** (int(args[-1]))
+    binfile = [args[0]]
+    binaddr = [int(args[1], 16)]
     bindata = []
     aux = []
 
     for i in range(nFiles - 1):
-        binfile.append(argv[(i + 1) * 2])
-        binaddr.append(int(argv[(i + 1) * 2 + 1], 16))
+        binfile.append(args[(i + 1) * 2])
+        binaddr.append(int(args[(i + 1) * 2 + 1], 16))
 
     for i in range(nFiles):
         with open(binfile[i], "rb") as f:

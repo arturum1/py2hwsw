@@ -107,21 +107,30 @@ def cnsl_sendfile():
     # receive file name
     name = cnsl_recvstr()
 
-    # open file to send
-    f = open(name, "rb")
-    file_size = os.path.getsize(name)
+    # open file to send; if missing, send a 0-byte file so the bootloader
+    # can detect "no value" via recvfile() returning 0.
+    try:
+        f = open(name, "rb")
+        file_size = os.path.getsize(name)
+    except FileNotFoundError:
+        print(PROGNAME, end="")
+        print(": file {0} not found, sending empty payload".format(name))
+        file_size = 0
+        f = open(os.devnull, "rb")
     print(PROGNAME, end="")
     print(": file of size {0} bytes".format(file_size))
     if SerialFlag:
         ser.write(file_size.to_bytes(4, byteorder="little"))  # send file size
         while ser.read() != ACK:
             pass
-        ser.write(f.read())  # send file
+        if file_size > 0:
+            ser.write(f.read())  # send file
     else:
         tb_write(file_size.to_bytes(4, byteorder="little"), 4)
         while tb_read.read(1) != ACK:
             pass
-        tb_write(f.read(), file_size, True)
+        if file_size > 0:
+            tb_write(f.read(), file_size, True)
     f.close()
     print(PROGNAME, end="")
     print(": file sent")

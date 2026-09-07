@@ -96,7 +96,6 @@ def setup(py_params: dict):
         sw_mstatush = True
         sw_cbo = False
 
-
     num_xbar_managers = 0
     for param_name in ["use_intmem", "use_extmem", "use_bootrom", "use_peripherals"]:
         if params[param_name]:

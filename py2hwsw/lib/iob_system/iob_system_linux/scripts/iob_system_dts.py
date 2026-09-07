@@ -19,27 +19,52 @@ def generate_dts(dts_parameters):
         "spdx_year": dts_parameters.get("spdx_year", "2025"),
         "spdx_license": dts_parameters.get("spdx_license", "MIT"),
     }
+
+    cpu_name = dts_parameters.get("cpu", "iob_vexriscv")
+    is_ibex = "ibex" in cpu_name
+
     # Use 'console=ttyS0,115200' for Linux 8250 serial driver (interrupts). Use 'console=hvc0` for OpenSBI serial driver (polling).
-    bootargs = dts_parameters.get(
-        "bootargs",
-        "rootwait console=hvc0 earlycon=sbi root=/dev/ram0 init=/sbin/init swiotlb=32 loglevel=8",
+    # Ibex has no MMU / no S-mode, so the kernel runs in M-mode and the console
+    # is a regular 8250 UART (no OpenSBI hvc0 / earlycon=sbi).
+    if is_ibex:
+        default_bootargs = (
+            "rootwait console=ttyS0,115200 root=/dev/ram0 init=/sbin/init loglevel=8"
+        )
+    else:
+        default_bootargs = "rootwait console=hvc0 earlycon=sbi root=/dev/ram0 init=/sbin/init swiotlb=32 loglevel=8"
+    bootargs = dts_parameters.get("bootargs", default_bootargs)
+
+    # On Ibex (M-mode only, no S-mode) the PLIC/CLINT are wired to the
+    # M-mode interrupt lines of the CPU interrupt controller:
+    #   - Machine external interrupt (PLIC) = 11
+    #   - Machine software interrupt (CLINT MSI) = 3
+    #   - Machine timer interrupt (CLINT MTI) = 7
+    # On MMU cores (VexRiscv, CVA6) we also wire the S-mode context:
+    #   - S-mode external interrupt = 9
+    plic_clint_interrupts_extended = (
+        " < &CPU0_intc 3 &CPU0_intc 7 >"  # CLINT: M-mode MSI + MTI
     )
+    plic_interrupts_extended = " < &CPU0_intc 11"  # PLIC: M-mode external
+    if not is_ibex:
+        plic_interrupts_extended += (
+            "\n                                    &CPU0_intc 9"  # S-mode external
+        )
+    plic_interrupts_extended += " >;"
 
     extra_peripherals = ""
     if dts_parameters["hardcoded_plic_cint"]:
         # Only need hardcoded PLIC and CLINT if they included in the CPU wrapper (and are not in the iob_system's peripherals list)
-        extra_peripherals += """
+        extra_peripherals += f"""
         // Hardcoded PLIC and CLINT
 
-        CLINT0: clint@/*CLINT0_BASE_MACRO*/ {
+        CLINT0: clint@/*CLINT0_BASE_MACRO*/ {{
             compatible = "riscv,clint0";
             reg = <0x/*CLINT0_BASE_MACRO*/ 0xc0000>;
-            interrupts-extended = < &CPU0_intc 3
-                                    &CPU0_intc 7 >;
+            interrupts-extended ={plic_clint_interrupts_extended}
             reg-names = "control";
-        };
+        }};
 
-        PLIC0: plic@/*PLIC0_BASE_MACRO*/ {
+        PLIC0: plic@/*PLIC0_BASE_MACRO*/ {{
             compatible = "riscv,plic0";
             reg = <0x/*PLIC0_BASE_MACRO*/ 0x4000000>;
 
@@ -47,22 +72,32 @@ def generate_dts(dts_parameters):
             #interrupt-cells = <1>; // PLIC interrupt specifiers use 1 cell: the interrupt ID number
             interrupt-controller; // Declares this node as an interrupt controller
             // PLIC context connections to CPU interrupt controller:
-            // Context 0 on CPU0 IRQ 11, Context 1 on CPU0 IRQ 9 (for M-mode/S-mode)
-            interrupts-extended = < &CPU0_intc 11
-                                    &CPU0_intc 9 >;
+            // Context 0 on CPU0 IRQ 11 (M-mode external){("; Context 1 on CPU0 IRQ 9 (S-mode external)" if not is_ibex else "")}
+            interrupts-extended ={plic_interrupts_extended}
             reg-names = "control"; // Names the register region ("control" for PLIC CSRs)
             //riscv,max-priority = <4>; // Maximum interrupt priority level supported (0-4 scale)
             riscv,ndev = <31>; // Number of external interrupt sources/lines supported by this PLIC (1-31
-        };
+        }};
 """
-
-    cpu_name = dts_parameters.get("cpu", "iob_vexriscv")
 
     if "vexiiriscv" in cpu_name:
         cpu_model = "IOb-System-Linux, VexiiRiscv"
         riscv_isa = "rv32imac_zicsr_zifencei_zicbom"
         extra_cpu_props = "            riscv,cbom-block-size = <64>; // Define the cache line size (VexiiRiscv default is 64 bytes) - needed for zicbom cache management\n"
         bus_dma_prop = "        dma-noncoherent; // tells Linux that every peripheral of this bus using DMA need explicit cache flushes\n"
+        mmu_type = "riscv,sv32"
+        cache_tlb_props = """            d-cache-block-size = <0x40>;
+            d-cache-sets = <0x40>;
+            d-cache-size = <0x8000>;
+            d-tlb-sets = <0x1>;
+            d-tlb-size = <0x20>;
+            i-cache-block-size = <0x40>;
+            i-cache-sets = <0x40>;
+            i-cache-size = <0x8000>;
+            i-tlb-sets = <0x1>;
+            i-tlb-size = <0x20>;
+            tlb-split;
+"""
     elif "cva6" in cpu_name:
         # CVA6 rv32imac + Sv32 MMU (cv32a6_imac_sv32 config). CVA6
         # implements Zicsr and Zifencei natively but does NOT implement
@@ -73,13 +108,56 @@ def generate_dts(dts_parameters):
         riscv_isa = "rv32imac_zicsr_zifencei"
         extra_cpu_props = ""
         bus_dma_prop = "        dma-noncoherent; // tells Linux that every peripheral of this bus using DMA need explicit cache flushes\n"
+        mmu_type = "riscv,sv32"
+        cache_tlb_props = """            d-cache-block-size = <0x40>;
+            d-cache-sets = <0x40>;
+            d-cache-size = <0x8000>;
+            d-tlb-sets = <0x1>;
+            d-tlb-size = <0x20>;
+            i-cache-block-size = <0x40>;
+            i-cache-sets = <0x40>;
+            i-cache-size = <0x8000>;
+            i-tlb-sets = <0x1>;
+            i-tlb-size = <0x20>;
+            tlb-split;
+"""
+    elif is_ibex:
+        # Ibex: RV32IM, no MMU, M-mode only. No compressed (c) extension
+        # because we keep BR2_RISCV_ISA_RVC=n in the buildroot defconfig.
+        # Ibex has no data cache and no TLB, so we must NOT emit any
+        # mmu-type / cache / tlb properties. CONFIG_MMU=n in the kernel.
+        cpu_model = "IOb-System-Linux, Ibex"
+        riscv_isa = "rv32ima_zicsr_zifencei"
+        extra_cpu_props = ""
+        bus_dma_prop = ""
+        mmu_type = None
+        cache_tlb_props = ""
     else:  # vexriscv / default
         cpu_model = "IOb-System-Linux, VexRiscv"
         riscv_isa = "rv32imac_zicsr_zifencei"
         extra_cpu_props = ""
         bus_dma_prop = ""
+        mmu_type = "riscv,sv32"
+        cache_tlb_props = """            d-cache-block-size = <0x40>;
+            d-cache-sets = <0x40>;
+            d-cache-size = <0x8000>;
+            d-tlb-sets = <0x1>;
+            d-tlb-size = <0x20>;
+            i-cache-block-size = <0x40>;
+            i-cache-sets = <0x40>;
+            i-cache-size = <0x8000>;
+            i-tlb-sets = <0x1>;
+            i-tlb-size = <0x20>;
+            tlb-split;
+"""
         # FIXME: AN: I think vexriscv is also noncoherent with DMA peripherals since it has a data cache that must be invalidated to ensure peripehral DMA data is read correctly.
         # bus_dma_prop = "        dma-noncoherent; // tells Linux that every peripheral of this bus using DMA need explicit cache flushes\n"
+
+    # Build the mmu-type line (only when MMU is present)
+    if mmu_type is not None:
+        mmu_type_line = f'            mmu-type = "{mmu_type}";\n'
+    else:
+        mmu_type_line = ""
 
     # Generate DTS file
     dts = f"""
@@ -107,19 +185,7 @@ def generate_dts(dts_parameters):
             status = "okay";
             compatible = "riscv";
             riscv,isa = "{riscv_isa}";
-{extra_cpu_props}            mmu-type = "riscv,sv32";
-            d-cache-block-size = <0x40>;
-            d-cache-sets = <0x40>;
-            d-cache-size = <0x8000>;
-            d-tlb-sets = <0x1>;
-            d-tlb-size = <0x20>;
-            i-cache-block-size = <0x40>;
-            i-cache-sets = <0x40>;
-            i-cache-size = <0x8000>;
-            i-tlb-sets = <0x1>;
-            i-tlb-size = <0x20>;
-            tlb-split;
-            CPU0_intc: interrupt-controller {{
+{extra_cpu_props}{mmu_type_line}{cache_tlb_props}            CPU0_intc: interrupt-controller {{
                 #address-cells = <0>;
                 #interrupt-cells = <1>;
                 interrupt-controller;

@@ -6,7 +6,9 @@ CONFIG_NONPORTABLE=y
 CONFIG_ARCH_RV32I=y
 CONFIG_RISCV_ISA_M=y
 CONFIG_RISCV_ISA_A=y
-CONFIG_RISCV_ISA_C=y
+# Ibex has the C (compressed) extension. If testing on a CPU without C
+# (e.g. the VexRiscv Linux variant), set this to 'n' and rebuild the kernel.
+CONFIG_RISCV_ISA_C=n
 CONFIG_SIFIVE_PLIC=y
 CONFIG_FPU=n
 CONFIG_SMP=n

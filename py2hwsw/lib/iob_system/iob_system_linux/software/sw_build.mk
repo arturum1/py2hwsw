@@ -56,7 +56,7 @@ endif
 #
 
 iob_system_linux_bootrom.hex: ../../software/iob_system_linux_preboot.bin ../../software/iob_system_linux_boot.bin
-	../../scripts/makehex.py $^ 00000080 $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,BOOTROM_ADDR_W) $@
+	../../scripts/makehex.py ../../software/iob_system_linux_preboot.bin 0 ../../software/iob_system_linux_boot.bin 00000080 $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,BOOTROM_ADDR_W) $@
 
 #
 # OS
@@ -78,16 +78,24 @@ LINUX_DIR = Image
 LINUX_ADDR:=00400000
 ROOTFS_DIR = rootfs.cpio.gz
 ROOTFS_ADDR:=01000000
-FIRM_ARGS = $(DTB_DIR) $(DTB_ADDR)
-FIRM_ARGS += $(LINUX_DIR) $(LINUX_ADDR)
+# In M-mode (no OpenSBI), the kernel Image is loaded at LINUX_ADDR (offset
+# from FW_BASEADDR). DTB and rootfs follow at higher offsets. The bootloader's
+# jump target is the absolute address of the kernel (FW_BASEADDR + LINUX_ADDR).
+FIRM_ARGS = $(LINUX_DIR) $(LINUX_ADDR)
+FIRM_ARGS += $(DTB_DIR) $(DTB_ADDR)
 FIRM_ARGS += $(ROOTFS_DIR) $(ROOTFS_ADDR)
 UTARGETS += compile_device_tree
 FIRMWARE := iob_system_linux.dtb Image rootfs.cpio.gz
+# Runtime next-boot configuration files (ASCII hex strings).
+# The bootloader reads these to determine where to jump and the DTB address
+# (no longer baked into the bitstream).
+FIRMWARE += iob_system_linux_next_boot_addr iob_system_linux_next_boot_dtb_addr
 # Set simulation/FPGA board grab timeout to 1 hour
 GRAB_TIMEOUT ?= 3600
 else
-FIRM_ARGS = $<
-UTARGETS += iob_system_linux_firmware 
+# Baremetal: firmware is the first (and only) file at address 0.
+FIRM_ARGS = $< 0
+UTARGETS += iob_system_linux_firmware
 FIRMWARE := iob_system_linux_firmware.bin
 endif
 FIRM_ADDR_W = $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,MEM_ADDR_W)
@@ -96,7 +104,7 @@ FIRM_ADDR_W = $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,MEM_ADDR_W)
 iob_system_linux_firmware.hex: $(FIRMWARE)
 	../../scripts/makehex.py $(FIRM_ARGS) $(FIRM_ADDR_W) $@
 #	../../scripts/hex_split.py iob_system_linux_firmware .
-	../../scripts/makehex.py --split $< $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,MEM_ADDR_W) $@
+	../../scripts/makehex.py --split $< 0 $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,MEM_ADDR_W) $@
 
 iob_system_linux_firmware.bin: ../../software/iob_system_linux_firmware.bin
 	cp $< $@
@@ -112,6 +120,18 @@ iob_system_linux.dtb:
 
 Image rootfs.cpio.gz:
 	cp $(ROOT_DIR)/software/src/$@ .
+
+# Generate the next-boot address text file consumed by the bootloader.
+# The value is the absolute address to jump to after the bootloader finishes.
+# In M-mode (no OpenSBI), this is the absolute address where the Linux kernel
+# Image is loaded: FW_BASEADDR + LINUX_ADDR.
+iob_system_linux_next_boot_addr:
+	printf '%x\n' $$(( $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,FW_BASEADDR) + 0x$(LINUX_ADDR) )) > $@
+
+# Generate the DTB address text file consumed by the bootloader.
+# Absolute DTB address = FW_BASEADDR + DTB_ADDR.
+iob_system_linux_next_boot_dtb_addr:
+	printf '%x\n' $$(( $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,FW_BASEADDR) + 0x$(DTB_ADDR) )) > $@
 
 ifeq ($(SIMULATION),1)
 FLOW_DIR = $(ROOT_DIR)/hardware/simulation
@@ -266,7 +286,7 @@ iob_system_linux_firmware: iob_bsp
 	make $@.elf INCLUDES="$(IOB_SYSTEM_LINUX_INCLUDES)" LFLAGS="$(IOB_SYSTEM_LINUX_LFLAGS) -Wl,-Map,$@.map" SRC="$(IOB_SYSTEM_LINUX_FW_SRC)" TEMPLATE_LDS="$(TEMPLATE_LDS)"
 
 check_if_run_linux:
-	python3 $(ROOT_DIR)/scripts/check_if_run_linux.py $(ROOT_DIR) iob_system_linux $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,FW_BASEADDR) $(RUN_LINUX)
+	python3 $(ROOT_DIR)/scripts/check_if_run_linux.py $(ROOT_DIR) iob_system_linux $(call GET_IOB_SYSTEM_LINUX_CONF_MACRO,FW_BASEADDR) $(RUN_LINUX) --no-opensbi
 
 iob_system_linux_boot: iob_bsp
 	make $@.elf INCLUDES="$(IOB_SYSTEM_LINUX_INCLUDES)" LFLAGS="$(IOB_SYSTEM_LINUX_LFLAGS) -Wl,-Map,$@.map" SRC="$(IOB_SYSTEM_LINUX_BOOT_SRC)" TEMPLATE_LDS="$(TEMPLATE_LDS)"
