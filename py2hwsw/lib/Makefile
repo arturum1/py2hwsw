@@ -67,11 +67,11 @@ all: sim-test
 setup:
 	nix-shell --run "py2hwsw $(CORE) setup --build_dir '$(BUILD_DIR)' --py_params '$(PY_PARAMS)' $(SETUP_ARGS)"
 
-sim-build:
-	nix-shell --run "scripts/test.sh build $(CORE)"
+sim-build: clean setup
+	nix-shell --run "make -C $(BUILD_DIR) sim-build"
 
-sim-run:
-	nix-shell --run "VCD=$(VCD) scripts/test.sh $(CORE)"
+sim-run: clean setup
+	nix-shell --run "make -C $(BUILD_DIR) sim-run"
 
 sim-test:
 	nix-shell --run "scripts/test.sh test"
@@ -79,8 +79,8 @@ sim-test:
 sim-clean:
 	nix-shell --run "scripts/test.sh clean"
 
-fpga-build:
-	nix-shell --run "make clean setup && make -C $(BUILD_DIR) fpga-sw-build BOARD=$(BOARD)" && make -C $(BUILD_DIR)/ fpga-build BOARD=$(BOARD)
+fpga-build: clean setup
+	nix-shell --run "make -C $(BUILD_DIR) fpga-sw-build BOARD=$(BOARD)" && make -C $(BUILD_DIR)/ fpga-build BOARD=$(BOARD)
 
 fpga-run: fpga-build
 	make -C $(BUILD_DIR)/ fpga-run BOARD=$(BOARD)

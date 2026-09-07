@@ -47,9 +47,11 @@ VHDR += $(wildcard ../common_src/*.vh)
 VSRC += $(wildcard ../common_src/*.v)
 
 VHDR += $(wildcard ../src/*.svh) $(wildcard ./src/*.svh)
-VSRC += $(wildcard ../src/*.sv) $(wildcard ./src/*.sv)
+ALL := $(wildcard ../src/*.sv) $(wildcard ./src/*.sv)
+VSRC := $(VSRC) $(filter %_pkg.sv, $(ALL)) $(filter-out %_pkg.sv, $(ALL))
 VHDR += $(wildcard ../common_src/*.svh)
-VSRC += $(wildcard ../common_src/*.sv)
+ALL := $(wildcard ../common_src/*.sv)
+VSRC := $(VSRC) $(filter %_pkg.sv, $(ALL)) $(filter-out %_pkg.sv, $(ALL))
 
 ifneq ($(wildcard $(FPGA_TOOL)/$(BOARD)/$(FPGA_TOP).v),)
 VSRC+=$(FPGA_TOOL)/$(BOARD)/$(FPGA_TOP).v
