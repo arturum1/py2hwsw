@@ -347,6 +347,7 @@ def setup(py_params: dict):
     if py_params.get("py2hwsw_target", "") == "setup" and py_params["build_dir"]:
         for src_file in [
             "scripts/check_if_run_linux.py",
+            "scripts/patch_opensbi.sh",
         ]:
             src = os.path.join(os.path.dirname(__file__), src_file)
             dst = os.path.join(py_params["build_dir"], src_file)
