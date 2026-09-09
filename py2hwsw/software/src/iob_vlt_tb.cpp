@@ -34,7 +34,7 @@ vluint64_t sim_time = 0;
 // Delayed start time of VCD trace dump
 // Used to avoid large VCD dump files during long simulations
 #if (VM_TRACE == 1)
-//vluint64_t vcd_delayed_start = 0;
+vluint64_t vcd_delayed_start = 0;
 //vluint64_t vcd_delayed_start = 22600005; // At the end of opensbi banner
 // Trace depth for CPU signals (1=only top-level, higher=include CPU internals)
 vluint64_t vcd_trace_depth = 6;
