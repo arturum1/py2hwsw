@@ -60,9 +60,9 @@ def generate_dts(dts_parameters):
 
     if "vexiiriscv" in cpu_name:
         cpu_model = "IOb-System-Linux, VexiiRiscv"
-        riscv_isa = "rv32imac_zicsr_zifencei_zicbom"
-        extra_cpu_props = "            riscv,cbom-block-size = <64>; // Define the cache line size (VexiiRiscv default is 64 bytes) - needed for zicbom cache management\n"
-        bus_dma_prop = "        dma-noncoherent; // tells Linux that every peripheral of this bus using DMA need explicit cache flushes\n"
+        riscv_isa = "rv32ima_zicsr_zifencei"
+        extra_cpu_props = ""
+        bus_dma_prop = ""
     elif "cva6" in cpu_name:
         # CVA6 rv32imac + Sv32 MMU (cv32a6_imac_sv32 config). CVA6
         # implements Zicsr and Zifencei natively but does NOT implement
@@ -72,7 +72,7 @@ def generate_dts(dts_parameters):
         cpu_model = "IOb-System-Linux, CVA6"
         riscv_isa = "rv32imac_zicsr_zifencei"
         extra_cpu_props = ""
-        bus_dma_prop = "        dma-noncoherent; // tells Linux that every peripheral of this bus using DMA need explicit cache flushes\n"
+        bus_dma_prop = ""
     else:  # vexriscv / default
         cpu_model = "IOb-System-Linux, VexRiscv"
         riscv_isa = "rv32imac_zicsr_zifencei"
@@ -108,17 +108,6 @@ def generate_dts(dts_parameters):
             compatible = "riscv";
             riscv,isa = "{riscv_isa}";
 {extra_cpu_props}            mmu-type = "riscv,sv32";
-            d-cache-block-size = <0x40>;
-            d-cache-sets = <0x40>;
-            d-cache-size = <0x8000>;
-            d-tlb-sets = <0x1>;
-            d-tlb-size = <0x20>;
-            i-cache-block-size = <0x40>;
-            i-cache-sets = <0x40>;
-            i-cache-size = <0x8000>;
-            i-tlb-sets = <0x1>;
-            i-tlb-size = <0x20>;
-            tlb-split;
             CPU0_intc: interrupt-controller {{
                 #address-cells = <0>;
                 #interrupt-cells = <1>;

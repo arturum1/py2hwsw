@@ -30,7 +30,7 @@ platform-runcmd = cp build/platform/iob_system_linux/firmware/*.bin $(OS_BUILD_D
 #
 PLATFORM_RISCV_XLEN = 32
 PLATFORM_RISCV_ABI = ilp32
-PLATFORM_RISCV_ISA = rv32imac_zicsr_zifencei_zicbom  # Supports Zicbom extensions for cache management
+PLATFORM_RISCV_ISA = rv32ima_zicsr_zifencei
 # PLATFORM_RISCV_CODE_MODEL = medany
 
 # Space separated list of object file names to be compiled for the platform
