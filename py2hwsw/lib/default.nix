@@ -36,6 +36,7 @@
 # kactus2 (commit 19c5702)
 # doxygen-1.16.1
 # librelane-3.0.3
+# ciel-3.10.4
 
 let
   # For debug
@@ -215,6 +216,7 @@ let
     (callPackage ./scripts/kactus2.nix { })
     doxygen
     librelane
+    ciel
     py2hwsw
   ] ++ extra_pkgs;
 
