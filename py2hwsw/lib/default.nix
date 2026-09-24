@@ -7,43 +7,35 @@
 # > pip install -e path/to/py2hwsw_directory
 
 
-{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/25.05.tar.gz") {}, py2hwsw_pkg ? "none", extra_pkgs ? [] }:
+{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/26.05.tar.gz") {}, py2hwsw_pkg ? "none", extra_pkgs ? [] }:
 # Py2HWSW uses the following dependencies from nixpkgs version 24.05:
-# bash-interactive-5.2p37
+# bash-interactive-5.3p9
 # gnumake-4.4.1
-# iverilog-12.0
-# verilator (custom version v5.040)
-# gtkwave-3.3.121
-# python3-3.12.10
-# python3 black-25.1.0
-# python3 mypy-1.15.0
-# python3 parse-1.20.2
-# python3 numpy-2.2.5
-# python3 wavedrom-2.0.3.post3
-# python3 matplotlib-3.10.1
-# python3 scipy-1.15.3
-# python3 pyserial-3.5
-# python3 pydantic-2.11.1
-# python3 jinja2-3.1.6
-# texlive-combined-2024
+# iverilog-13.0
+# gtkwave-3.3.127
+# python3-3.13.13
+# python3-3.13.13-env
+# texlive-combined-2025
 # riscv-gnu-toolchain (tag 2026.04.05)
-# verible-0.0.3956
+# verible-0.0.4023
 # black-25.1.0
-# clang-wrapper-14.0.6
-# librsvg-2.60.0
+# clang-wrapper-21.1.8
+# librsvg-2.62.1
 # soffice
-# openjdk-21.0.7+6
+# openjdk-21.0.12+2
 # minicom-2.10
 # lrzsz-0.12.20
-# python3.12-volare (commit 47325949b87e857d75f81d306f02ebccf952cb15)
+# python3.13-volare
+# verilator (custom version v5.040)
 # yosys (commit 543faed9c8cd7c33bbb407577d56e4b7444ba61c)
-# gcc-wrapper-14.2.1.20250322
-# libcap-2.75
-# reuse-5.0.2
-# python3.12-fusesoc-2.4.5
-# python3.12-fusesoc-publish-v0.1.0
+# gcc-wrapper-15.2.0
+# libcap-2.77
+# reuse-6.2.0
+# python3.13-fusesoc-2.4.5
+# python3.13-fusesoc-publish-v0.1.0
 # kactus2 (commit 19c5702)
-# doxygen-1.13.2
+# doxygen-1.16.1
+# librelane-3.0.3
 
 let
   # For debug
@@ -124,7 +116,7 @@ let
     nativeBuildInputs = with pkgs.python3.pkgs; [
       setuptools
       wheel
-      setuptools_scm
+      setuptools-scm
     ];
 
     #doCheck = false;  # Skip tests (optional, speeds up build)
@@ -171,7 +163,7 @@ let
   py2hwsw_dependencies = with pkgs; [
     bash
     gnumake
-    verilog
+    iverilog
     gtkwave
     python3
     pythonEnv
@@ -181,7 +173,7 @@ let
     # pkgsCross.riscv64-embedded.buildPackages.gcc # newlib: riscv64-none-elf-*
     verible
     black
-    llvmPackages_14.clangUseLLVM
+    clang
     librsvg
     libreofficeWithEnv
     jre # Dependency of libreoffice
@@ -195,9 +187,24 @@ let
         rev = "47325949b87e857d75f81d306f02ebccf952cb15";
         sha256 = "sha256-H9B/vZUs0O2jwmidCTMYhO0JY4DL+gmQNeVawaccvuU=";
       };
+      
+      volarePkgs = pkgs // {
+        python3 = pkgs.python3 // {
+          pkgs = pkgs.python3.pkgs // {
+            buildPythonPackage = args: pkgs.python3.pkgs.buildPythonPackage (args // {
+              pyproject = true;
+              build-system = (args.build-system or []) ++ [ pkgs.python3.pkgs.setuptools ];
+              
+              # Force Nix to bypass the runtime version assertion pass
+              dontCheckRuntimeDeps = true;
+            });
+          };
+        };
+      };
     in import "${volareSrc}" {
-      inherit pkgs;
+      pkgs = volarePkgs;
     })
+
     verilator_v5_040
     yosys
     gcc
@@ -207,6 +214,7 @@ let
     fusesoc_publish
     (callPackage ./scripts/kactus2.nix { })
     doxygen
+    librelane
     py2hwsw
   ] ++ extra_pkgs;
 
@@ -221,7 +229,7 @@ let
 in
 
 # Uncomment line below to print the Py2HWSW dependency names and versions
-# builtins.trace ("Nix dependency versions:\n" + (builtins.concatStringsSep "\n" list_of_pkg_names))
+#builtins.trace ("Nix dependency versions:\n" + (builtins.concatStringsSep "\n" list_of_pkg_names))
 
 pkgs.mkShell {
   name = "iob-shell";

@@ -56,6 +56,7 @@ let
       sed -i "s@-lreadline@-ledit@" ./Makefile
     '';
     nativeBuildInputs = [ cmake ];
+    cmakeFlags = [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
     buildInputs = [ libedit ];
     installPhase = "mkdir -p $out/bin && mv abc $out/bin";
     passthru.rev = rev;

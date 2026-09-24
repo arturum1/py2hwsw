@@ -58,6 +58,7 @@ let
     patches = [
       ./patches/yosys/fix-clang-build.patch
       ./patches/yosys/plugin-search-dirs.patch
+      ./patches/yosys/fix-json11-cstdint.patch
     ];
 
     postPatch = ''

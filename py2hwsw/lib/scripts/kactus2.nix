@@ -22,8 +22,7 @@ pkgs.stdenv.mkDerivation {
     sha256 = "jAMu/BqBjXP35skXXPu2zU5PZVJvangyyoLRjqkmLuI=";
   };
 
-  # Replace pkgs.swig4 with pkgs.swig on newer nixpkgs (> 24.05)
-  nativeBuildInputs = [ pkgs.git pkgs.swig4 pkgs.qt6.wrapQtAppsHook ];
+  nativeBuildInputs = [ pkgs.git pkgs.swig pkgs.qt6.wrapQtAppsHook ];
   buildInputs = [ pkgs.qt6.qtbase pkgs.qt6.qttools pkgs.qt6.qtsvg unifiedQt6Bin pkgs.libGL pkgs.python3 ];
 
   configurePhase = ''
