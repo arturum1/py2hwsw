@@ -1206,90 +1206,133 @@ extern iptr versat_base;
 #define TOP_eliece_mat_addr ((void *)(versat_base + memMappedStart + 0x10000))
 
 #define ACCELERATOR_TOP_ADDR_INIT                                              \
-  {                                                                            \
-    TOP_aes_key_0_addr, TOP_aes_key_1_addr, TOP_aes_key_2_addr,                \
-        TOP_aes_key_3_addr, TOP_aes_key_4_addr, TOP_aes_key_5_addr,            \
-        TOP_aes_key_6_addr, TOP_aes_key_7_addr, TOP_aes_key_8_addr,            \
-        TOP_aes_key_9_addr, TOP_aes_key_10_addr, TOP_aes_key_11_addr,          \
-        TOP_aes_key_12_addr, TOP_aes_key_13_addr, TOP_aes_key_14_addr,         \
-        TOP_aes_key_15_addr, TOP_aes_state_0_addr, TOP_aes_state_1_addr,       \
-        TOP_aes_state_2_addr, TOP_aes_state_3_addr, TOP_aes_state_4_addr,      \
-        TOP_aes_state_5_addr, TOP_aes_state_6_addr, TOP_aes_state_7_addr,      \
-        TOP_aes_state_8_addr, TOP_aes_state_9_addr, TOP_aes_state_10_addr,     \
-        TOP_aes_state_11_addr, TOP_aes_state_12_addr, TOP_aes_state_13_addr,   \
-        TOP_aes_state_14_addr, TOP_aes_state_15_addr,                          \
-        TOP_aes_lastResult_0_addr, TOP_aes_lastResult_1_addr,                  \
-        TOP_aes_lastResult_2_addr, TOP_aes_lastResult_3_addr,                  \
-        TOP_aes_lastResult_4_addr, TOP_aes_lastResult_5_addr,                  \
-        TOP_aes_lastResult_6_addr, TOP_aes_lastResult_7_addr,                  \
-        TOP_aes_lastResult_8_addr, TOP_aes_lastResult_9_addr,                  \
-        TOP_aes_lastResult_10_addr, TOP_aes_lastResult_11_addr,                \
-        TOP_aes_lastResult_12_addr, TOP_aes_lastResult_13_addr,                \
-        TOP_aes_lastResult_14_addr, TOP_aes_lastResult_15_addr,                \
-        TOP_aes_lastValToAdd_0_addr, TOP_aes_lastValToAdd_1_addr,              \
-        TOP_aes_lastValToAdd_2_addr, TOP_aes_lastValToAdd_3_addr,              \
-        TOP_aes_lastValToAdd_4_addr, TOP_aes_lastValToAdd_5_addr,              \
-        TOP_aes_lastValToAdd_6_addr, TOP_aes_lastValToAdd_7_addr,              \
-        TOP_aes_lastValToAdd_8_addr, TOP_aes_lastValToAdd_9_addr,              \
-        TOP_aes_lastValToAdd_10_addr, TOP_aes_lastValToAdd_11_addr,            \
-        TOP_aes_lastValToAdd_12_addr, TOP_aes_lastValToAdd_13_addr,            \
-        TOP_aes_lastValToAdd_14_addr, TOP_aes_lastValToAdd_15_addr,            \
-        TOP_aes_schedule_s_b_0_addr, TOP_aes_schedule_s_b_1_addr,              \
-        TOP_aes_round_mixColumns_d_0_mul2_0_addr,                              \
-        TOP_aes_round_mixColumns_d_0_mul2_1_addr,                              \
-        TOP_aes_round_mixColumns_d_0_mul3_0_addr,                              \
-        TOP_aes_round_mixColumns_d_0_mul3_1_addr,                              \
-        TOP_aes_round_mixColumns_d_1_mul2_0_addr,                              \
-        TOP_aes_round_mixColumns_d_1_mul2_1_addr,                              \
-        TOP_aes_round_mixColumns_d_1_mul3_0_addr,                              \
-        TOP_aes_round_mixColumns_d_1_mul3_1_addr,                              \
-        TOP_aes_round_mixColumns_d_2_mul2_0_addr,                              \
-        TOP_aes_round_mixColumns_d_2_mul2_1_addr,                              \
-        TOP_aes_round_mixColumns_d_2_mul3_0_addr,                              \
-        TOP_aes_round_mixColumns_d_2_mul3_1_addr,                              \
-        TOP_aes_round_mixColumns_d_3_mul2_0_addr,                              \
-        TOP_aes_round_mixColumns_d_3_mul2_1_addr,                              \
-        TOP_aes_round_mixColumns_d_3_mul3_0_addr,                              \
-        TOP_aes_round_mixColumns_d_3_mul3_1_addr,                              \
-        TOP_aes_round_invMixColumns_d_0_mul9_0_addr,                           \
-        TOP_aes_round_invMixColumns_d_0_mul9_1_addr,                           \
-        TOP_aes_round_invMixColumns_d_0_mul11_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_0_mul11_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_0_mul13_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_0_mul13_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_0_mul14_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_0_mul14_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_1_mul9_0_addr,                           \
-        TOP_aes_round_invMixColumns_d_1_mul9_1_addr,                           \
-        TOP_aes_round_invMixColumns_d_1_mul11_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_1_mul11_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_1_mul13_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_1_mul13_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_1_mul14_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_1_mul14_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_2_mul9_0_addr,                           \
-        TOP_aes_round_invMixColumns_d_2_mul9_1_addr,                           \
-        TOP_aes_round_invMixColumns_d_2_mul11_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_2_mul11_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_2_mul13_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_2_mul13_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_2_mul14_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_2_mul14_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_3_mul9_0_addr,                           \
-        TOP_aes_round_invMixColumns_d_3_mul9_1_addr,                           \
-        TOP_aes_round_invMixColumns_d_3_mul11_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_3_mul11_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_3_mul13_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_3_mul13_1_addr,                          \
-        TOP_aes_round_invMixColumns_d_3_mul14_0_addr,                          \
-        TOP_aes_round_invMixColumns_d_3_mul14_1_addr, TOP_sha_cMem0_mem_addr,  \
-        TOP_sha_cMem1_mem_addr, TOP_sha_cMem2_mem_addr,                        \
-        TOP_sha_cMem3_mem_addr, TOP_sha_State_s_0_reg_addr,                    \
-        TOP_sha_State_s_1_reg_addr, TOP_sha_State_s_2_reg_addr,                \
-        TOP_sha_State_s_3_reg_addr, TOP_sha_State_s_4_reg_addr,                \
-        TOP_sha_State_s_5_reg_addr, TOP_sha_State_s_6_reg_addr,                \
-        TOP_sha_State_s_7_reg_addr, TOP_eliece_mat_addr                        \
-  }
+  {TOP_aes_key_0_addr,                                                         \
+   TOP_aes_key_1_addr,                                                         \
+   TOP_aes_key_2_addr,                                                         \
+   TOP_aes_key_3_addr,                                                         \
+   TOP_aes_key_4_addr,                                                         \
+   TOP_aes_key_5_addr,                                                         \
+   TOP_aes_key_6_addr,                                                         \
+   TOP_aes_key_7_addr,                                                         \
+   TOP_aes_key_8_addr,                                                         \
+   TOP_aes_key_9_addr,                                                         \
+   TOP_aes_key_10_addr,                                                        \
+   TOP_aes_key_11_addr,                                                        \
+   TOP_aes_key_12_addr,                                                        \
+   TOP_aes_key_13_addr,                                                        \
+   TOP_aes_key_14_addr,                                                        \
+   TOP_aes_key_15_addr,                                                        \
+   TOP_aes_state_0_addr,                                                       \
+   TOP_aes_state_1_addr,                                                       \
+   TOP_aes_state_2_addr,                                                       \
+   TOP_aes_state_3_addr,                                                       \
+   TOP_aes_state_4_addr,                                                       \
+   TOP_aes_state_5_addr,                                                       \
+   TOP_aes_state_6_addr,                                                       \
+   TOP_aes_state_7_addr,                                                       \
+   TOP_aes_state_8_addr,                                                       \
+   TOP_aes_state_9_addr,                                                       \
+   TOP_aes_state_10_addr,                                                      \
+   TOP_aes_state_11_addr,                                                      \
+   TOP_aes_state_12_addr,                                                      \
+   TOP_aes_state_13_addr,                                                      \
+   TOP_aes_state_14_addr,                                                      \
+   TOP_aes_state_15_addr,                                                      \
+   TOP_aes_lastResult_0_addr,                                                  \
+   TOP_aes_lastResult_1_addr,                                                  \
+   TOP_aes_lastResult_2_addr,                                                  \
+   TOP_aes_lastResult_3_addr,                                                  \
+   TOP_aes_lastResult_4_addr,                                                  \
+   TOP_aes_lastResult_5_addr,                                                  \
+   TOP_aes_lastResult_6_addr,                                                  \
+   TOP_aes_lastResult_7_addr,                                                  \
+   TOP_aes_lastResult_8_addr,                                                  \
+   TOP_aes_lastResult_9_addr,                                                  \
+   TOP_aes_lastResult_10_addr,                                                 \
+   TOP_aes_lastResult_11_addr,                                                 \
+   TOP_aes_lastResult_12_addr,                                                 \
+   TOP_aes_lastResult_13_addr,                                                 \
+   TOP_aes_lastResult_14_addr,                                                 \
+   TOP_aes_lastResult_15_addr,                                                 \
+   TOP_aes_lastValToAdd_0_addr,                                                \
+   TOP_aes_lastValToAdd_1_addr,                                                \
+   TOP_aes_lastValToAdd_2_addr,                                                \
+   TOP_aes_lastValToAdd_3_addr,                                                \
+   TOP_aes_lastValToAdd_4_addr,                                                \
+   TOP_aes_lastValToAdd_5_addr,                                                \
+   TOP_aes_lastValToAdd_6_addr,                                                \
+   TOP_aes_lastValToAdd_7_addr,                                                \
+   TOP_aes_lastValToAdd_8_addr,                                                \
+   TOP_aes_lastValToAdd_9_addr,                                                \
+   TOP_aes_lastValToAdd_10_addr,                                               \
+   TOP_aes_lastValToAdd_11_addr,                                               \
+   TOP_aes_lastValToAdd_12_addr,                                               \
+   TOP_aes_lastValToAdd_13_addr,                                               \
+   TOP_aes_lastValToAdd_14_addr,                                               \
+   TOP_aes_lastValToAdd_15_addr,                                               \
+   TOP_aes_schedule_s_b_0_addr,                                                \
+   TOP_aes_schedule_s_b_1_addr,                                                \
+   TOP_aes_round_mixColumns_d_0_mul2_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_0_mul2_1_addr,                                   \
+   TOP_aes_round_mixColumns_d_0_mul3_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_0_mul3_1_addr,                                   \
+   TOP_aes_round_mixColumns_d_1_mul2_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_1_mul2_1_addr,                                   \
+   TOP_aes_round_mixColumns_d_1_mul3_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_1_mul3_1_addr,                                   \
+   TOP_aes_round_mixColumns_d_2_mul2_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_2_mul2_1_addr,                                   \
+   TOP_aes_round_mixColumns_d_2_mul3_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_2_mul3_1_addr,                                   \
+   TOP_aes_round_mixColumns_d_3_mul2_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_3_mul2_1_addr,                                   \
+   TOP_aes_round_mixColumns_d_3_mul3_0_addr,                                   \
+   TOP_aes_round_mixColumns_d_3_mul3_1_addr,                                   \
+   TOP_aes_round_invMixColumns_d_0_mul9_0_addr,                                \
+   TOP_aes_round_invMixColumns_d_0_mul9_1_addr,                                \
+   TOP_aes_round_invMixColumns_d_0_mul11_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_0_mul11_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_0_mul13_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_0_mul13_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_0_mul14_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_0_mul14_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_1_mul9_0_addr,                                \
+   TOP_aes_round_invMixColumns_d_1_mul9_1_addr,                                \
+   TOP_aes_round_invMixColumns_d_1_mul11_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_1_mul11_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_1_mul13_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_1_mul13_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_1_mul14_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_1_mul14_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_2_mul9_0_addr,                                \
+   TOP_aes_round_invMixColumns_d_2_mul9_1_addr,                                \
+   TOP_aes_round_invMixColumns_d_2_mul11_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_2_mul11_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_2_mul13_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_2_mul13_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_2_mul14_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_2_mul14_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_3_mul9_0_addr,                                \
+   TOP_aes_round_invMixColumns_d_3_mul9_1_addr,                                \
+   TOP_aes_round_invMixColumns_d_3_mul11_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_3_mul11_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_3_mul13_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_3_mul13_1_addr,                               \
+   TOP_aes_round_invMixColumns_d_3_mul14_0_addr,                               \
+   TOP_aes_round_invMixColumns_d_3_mul14_1_addr,                               \
+   TOP_sha_cMem0_mem_addr,                                                     \
+   TOP_sha_cMem1_mem_addr,                                                     \
+   TOP_sha_cMem2_mem_addr,                                                     \
+   TOP_sha_cMem3_mem_addr,                                                     \
+   TOP_sha_State_s_0_reg_addr,                                                 \
+   TOP_sha_State_s_1_reg_addr,                                                 \
+   TOP_sha_State_s_2_reg_addr,                                                 \
+   TOP_sha_State_s_3_reg_addr,                                                 \
+   TOP_sha_State_s_4_reg_addr,                                                 \
+   TOP_sha_State_s_5_reg_addr,                                                 \
+   TOP_sha_State_s_6_reg_addr,                                                 \
+   TOP_sha_State_s_7_reg_addr,                                                 \
+   TOP_eliece_mat_addr}
 
 static unsigned int delayBuffer[] = {
     0x6,  0x6,  0x6,  0x6,  0x6,  0x6,  0x6,  0x6, 0x6, 0x6, 0x6, 0x6,  0x6,

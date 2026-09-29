@@ -762,7 +762,7 @@ static uint32_t ether_crc32(const uint8_t *data, size_t len) {
   for (size_t i = 0; i < len; i++) {
     crc ^= data[i];
     for (int b = 0; b < 8; b++)
-      crc = (crc >> 1) ^ (CRC32_POLY & (uint32_t) - (int32_t)(crc & 1));
+      crc = (crc >> 1) ^ (CRC32_POLY & (uint32_t)-(int32_t)(crc & 1));
   }
   return bitrev32(crc);
 }
