@@ -86,6 +86,37 @@ fpga-run: fpga-build
 	make -C $(BUILD_DIR)/ fpga-run BOARD=$(BOARD)
 
 
+# ASIC implementation (RTL to GDSII) with LibreLane.
+# ASIC_PDK: process design kit variant (e.g. sky130A, gf180mcuD)
+# CLOCK_PERIOD: clock period (ns) of the design's main clock domain
+# ASIC_FLAGS: extra flags forwarded to the ASIC flow makefile
+ASIC_PDK?=sky130A
+CLOCK_PERIOD?=10
+asic-build: clean setup
+	nix-shell --run "make -C $(BUILD_DIR) asic-build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) $(ASIC_FLAGS)"
+
+asic-run: asic-build
+
+asic-drc: asic-build
+	nix-shell --run "make -C $(BUILD_DIR) asic-drc ASIC_PDK=$(ASIC_PDK)"
+
+asic-lvs: asic-build
+	nix-shell --run "make -C $(BUILD_DIR) asic-lvs ASIC_PDK=$(ASIC_PDK)"
+
+asic-sta: asic-build
+	nix-shell --run "make -C $(BUILD_DIR) asic-sta ASIC_PDK=$(ASIC_PDK)"
+
+# Gate-level simulation of the place-and-route netlist, with the core's testbench
+asic-sim: asic-build
+	nix-shell --run "make -C $(BUILD_DIR) asic-sim"
+
+asic-report: asic-build
+	nix-shell --run "make -C $(BUILD_DIR) asic-report"
+
+asic-clean:
+	if [ -f "$(BUILD_DIR)/hardware/asic/Makefile" ]; then nix-shell --run "make -C $(BUILD_DIR) asic-clean"; fi
+
+
 doc-build: 
 	nix-shell --run "make clean setup && make -C $(BUILD_DIR) doc-build"
 

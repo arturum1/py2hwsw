@@ -139,6 +139,44 @@ syn-clean:
 syn-test: syn-clean syn-build
 
 #
+# ASIC
+#
+ASIC_DIR=hardware/asic
+# The ASIC flow requires the 'librelane' tool (see py2hwsw/lib/default.nix)
+ASIC_AVAILABLE := $(shell which librelane 2>/dev/null)
+asic-build:
+	make -C $(ASIC_DIR) build
+
+asic-drc:
+	make -C $(ASIC_DIR) drc
+
+asic-lvs:
+	make -C $(ASIC_DIR) lvs
+
+asic-sta:
+	make -C $(ASIC_DIR) sta
+
+asic-gui:
+	make -C $(ASIC_DIR) gui
+
+asic-sim:
+	make -C $(ASIC_DIR) sim-run
+
+asic-report:
+	make -C $(ASIC_DIR) report
+
+asic-clean:
+	if [ -f "$(ASIC_DIR)/Makefile" ]; then make -C $(ASIC_DIR) clean; fi
+
+# The ASIC flow is only part of the test suite if the tool is available
+ifeq ($(ASIC_AVAILABLE),)
+asic-test:
+	@echo "Note: Skipping ASIC test, 'librelane' not found in PATH."
+else
+asic-test: asic-build asic-report asic-sim
+endif
+
+#
 # DOCUMENT
 #
 DOC_DIR=document
@@ -169,7 +207,7 @@ test: sim-test fpga-test doc-test
 
 ptest: dtest lint-test sim-cov
 
-dtest: test syn-test 
+dtest: test syn-test asic-test
 
 
 
@@ -177,7 +215,7 @@ dtest: test syn-test
 # CLEAN
 #
 
-clean: sw-clean pc-emul-clean lint-clean sim-clean fpga-clean syn-clean doc-clean
+clean: sw-clean pc-emul-clean lint-clean sim-clean fpga-clean syn-clean asic-clean doc-clean
 
 
 .PHONY: sw-build sw-clean \
@@ -185,6 +223,8 @@ clean: sw-clean pc-emul-clean lint-clean sim-clean fpga-clean syn-clean doc-clea
 	lint-test lint-run lint-clean \
 	sim-build sim-run sim-debug sim-clean \
 	fpga-build fpga-debug fpga-gui fpga-clean \
+	syn-build syn-clean \
+	asic-build asic-drc asic-lvs asic-sta asic-gui asic-sim asic-report asic-clean \
 	doc-build doc-view doc-debug doc-test doc-clean \
 	test clean debug
 

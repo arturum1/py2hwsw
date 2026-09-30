@@ -337,6 +337,9 @@ class iob_core(iob_module, iob_instance):
             # Run post setup callbacks
             for callback in __class__.global_post_setup_callbacks:
                 callback()
+        # Generate the ASIC (LibreLane) flow configuration
+        if self.is_top_module:
+            setup_srcs.asic_config_setup(self)
         # Generate docs
         doc_gen.generate_docs(self)
         # Generate ipxact file
