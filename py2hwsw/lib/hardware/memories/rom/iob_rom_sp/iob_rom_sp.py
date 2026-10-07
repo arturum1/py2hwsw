@@ -39,6 +39,22 @@ def setup(py_params_dict):
                 "max": "NA",
                 "descr": "",
             },
+            {
+                "name": "MEM_ASIC",
+                "type": "P",
+                "val": "0",
+                "min": "0",
+                "max": "1",
+                "descr": "Use ASIC hard macros (1) or behavioral RTL (0)",
+            },
+            {
+                "name": "SIMULATION",
+                "type": "P",
+                "val": "0",
+                "min": "0",
+                "max": "1",
+                "descr": "Use behavioral model for simulation (1) or sky130 macros (0)",
+            },
         ],
         "ports": [
             {
@@ -54,24 +70,38 @@ def setup(py_params_dict):
         "snippets": [
             {
                 "verilog_code": """
-   localparam INIT_RAM = (MEM_INIT_FILE_INT != "none.hex") ? 1 : 0;
+    localparam INIT_RAM = (MEM_INIT_FILE_INT != "none.hex") ? 1 : 0;
+
+    generate
+        if (MEM_ASIC) begin : g_asic
+            // ASIC hard macro wrapper (sky130 SRAM 1RW+1R with write port tied off)
+            bootrom_wrapper #(
+                .ADDR_W(ADDR_W),
+                .DATA_W(DATA_W),
+                .HEXFILE(MEM_INIT_FILE_INT),
+                .SIMULATION(SIMULATION)
+            ) u_bootrom (
+                .clk(clk_i),
+                .addr(addr_i),
+                .data(r_data_o),
+                .VPWR(VPWR), .VGND(VGND)
+            );
+        end else begin : g_behavioral
             // Declare the ROM
-   reg [DATA_W-1:0] rom[(2**ADDR_W)-1:0];
-   reg [DATA_W-1:0] r_data_int;
+            reg [DATA_W-1:0] rom[(2**ADDR_W)-1:0];
+            reg [DATA_W-1:0] r_data_int;
 
-   // Initialize the ROM
-   generate
-       if (INIT_RAM) begin : mem_init
-           initial $readmemh( MEM_INIT_FILE_INT, rom, 0, (2 ** ADDR_W) - 1);
-       end
-   endgenerate
+            // Initialize the ROM
+            initial if (INIT_RAM) $readmemh( MEM_INIT_FILE_INT, rom, 0, (2 ** ADDR_W) - 1);
 
-   // Operate the ROM
-   always @(posedge clk_i) if (en_i) 
-   r_data_int <= rom[addr_i];
+            // Operate the ROM
+            always @(posedge clk_i) if (en_i)
+            r_data_int <= rom[addr_i];
 
-   assign r_data_o = r_data_int;
-            """,
+            assign r_data_o = r_data_int;
+        end
+    endgenerate
+             """,
             },
         ],
     }

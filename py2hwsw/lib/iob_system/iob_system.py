@@ -59,6 +59,10 @@ def setup(py_params: dict):
             {},
             "Core dictionary with attributes to override/append to the ones of iob_system. Usually passed by derived cores to add their own components.",
         ),
+        "asic_wrapper": (
+            False,
+            "If should include ASIC wrapper (defines MEM_ASIC=1 for hard macros).",
+        ),
     }
 
     # Converts dictionary tuple values into single values without description

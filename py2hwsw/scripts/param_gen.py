@@ -84,8 +84,15 @@ def generate_params_snippets(core):
 def validate_params(core):
     """Check if all parameters are within the allowed range"""
     core_parameters = get_core_params(core.confs)
+    print(f"DEBUG validate_params core: {core.name}, parameters: {core.parameters}")
     for p_name, p_value in core.parameters.items():
         if isinstance(p_value, str):
+            continue
+        if isinstance(p_value, list):
+            print(f"DEBUG: Parameter '{p_name}' has list value: {p_value}")
+            continue
+        if isinstance(p_value, dict):
+            print(f"DEBUG: Parameter '{p_name}' has dict value: {p_value}")
             continue
         conf = find_obj_in_list(core_parameters, p_name)
 

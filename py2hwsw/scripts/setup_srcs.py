@@ -12,7 +12,6 @@ import importlib.util
 
 # IObundle scripts imported:
 import iob_colors
-import asic_config_gen
 from iob_base import nix_permission_hack
 
 
@@ -28,14 +27,15 @@ def flows_setup(python_module):
     # Setup fpga
     fpga_setup(python_module)
 
+    # Setup ASIC
+    asic_setup(python_module)
+
     # Setup harware
     hw_setup(python_module)
 
     lint_setup(python_module)
 
     syn_setup(python_module)
-
-    asic_setup(python_module)
 
     # Setup software
     sw_setup(python_module)
@@ -273,29 +273,6 @@ INCLUDE_DIRS+=../../{python_module.relative_path_to_UUT}/hardware/src
         )
 
 
-def asic_setup(python_module):
-    """Copy the ASIC flow (LibreLane) files to the build directory"""
-    build_dir = python_module.build_dir
-    asic_dir = "hardware/asic"
-
-    shutil.copytree(
-        f"{get_lib_dir()}/{asic_dir}",
-        f"{build_dir}/{asic_dir}",
-        dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns("*.pdf"),
-    )
-    nix_permission_hack(f"{build_dir}/{asic_dir}")
-
-
-# Generate the ASIC flow configuration file, after the top module's Verilog was
-# generated (the flow's clock port is read from the generated module header).
-# Also runs the core's 'hardware/asic/asic_setup.py', if it exists, so that it
-# can adjust the configuration.
-def asic_config_setup(python_module):
-    asic_config_gen.asic_config_gen(python_module)
-    run_setup_functions(python_module, "asic_setup", setup_module=python_module)
-
-
 # Check if any *_setup.py modules exist (like sim_setup.py, fpga_setup.py, ...).
 # If so, get a function to execute them and run them
 # This will allow these modules to be executed during setup
@@ -306,7 +283,6 @@ def run_setup_functions(python_module, module_type, **kwargs):
     module_path = {
         "sim_setup": "hardware/simulation/sim_setup.py",
         "fpga_setup": "hardware/fpga/fpga_setup.py",
-        "asic_setup": "hardware/asic/asic_setup.py",
         "sw_setup": "software/sw_setup.py",
         "doc_setup": "document/doc_setup.py",
     }[module_type]
@@ -429,6 +405,41 @@ def write_git_revision_short_hash(dst_dir):
 # add_fpga_srcs: If True, then the list of FPGA sources will be appended to the srcs list
 # module_parameters: optional argument. Allows passing an optional object with parameters to a hardware module.
 # module_extension: Select module file extension (.v for hardware, .c for software)
+# Setup ASIC files
+def asic_setup(python_module):
+    """Copy ASIC flow wrapper and templates to build directory."""
+    build_dir = python_module.build_dir
+    asic_dir = "hardware/asic"
+    src_dir = f"{get_lib_dir()}/{asic_dir}"
+    dst_dir = f"{build_dir}/{asic_dir}"
+
+    # Copy ASIC templates (wrapper templates, sim.mk, etc.)
+    shutil.copytree(
+        src_dir,
+        dst_dir,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("*.pdf"),
+    )
+    nix_permission_hack(dst_dir)
+
+    # Copy iob_system ASIC wrapper template if iob_system
+    if hasattr(python_module, "name") and python_module.name == "iob_system":
+        src_wrapper = os.path.join(get_lib_dir(), "iob_system/hardware/asic/iob_system_asic.py")
+        if os.path.isfile(src_wrapper):
+            dst_wrapper = os.path.join(dst_dir, "iob_system_asic.py")
+            shutil.copy2(src_wrapper, dst_wrapper)
+            nix_permission_hack(dst_wrapper)
+        # Also copy the iob_system_asic directory structure if it exists
+        src_wrapper_dir = os.path.join(get_lib_dir(), "iob_system/hardware/asic")
+        if os.path.isdir(src_wrapper_dir):
+            for item in os.listdir(src_wrapper_dir):
+                src_item = os.path.join(src_wrapper_dir, item)
+                dst_item = os.path.join(dst_dir, item)
+                if os.path.isfile(src_item):
+                    shutil.copy2(src_item, dst_item)
+                    nix_permission_hack(dst_item)
+
+
 def lib_module_setup(
     headers,
     srcs,
@@ -741,7 +752,6 @@ def copy_rename_setup_directory(core, exclude_file_list=["*.py"]):
             "hardware/fpga",
             "hardware/syn",
             "hardware/lint",
-            "hardware/asic",
             "document",
         ]
 

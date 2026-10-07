@@ -52,6 +52,11 @@ ifneq ($(wildcard asic_build.mk),)
 include asic_build.mk
 endif
 
+# Bootrom/firmware hex files (mirrors sim_build.mk)
+BUILD_DEPS += $(NAME)_bootrom.hex $(NAME)_firmware.hex
+ROOT_DIR := ../..
+include $(ROOT_DIR)/software/sw_build.mk
+
 # Check that the tools and inputs are available before starting a long run
 check:
 	@which librelane >/dev/null || { echo "ERROR: 'librelane' not found in PATH."; exit 1; }

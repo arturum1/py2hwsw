@@ -24,9 +24,60 @@ def setup(py_params_dict):
             "ports": [],
         }
 
-    # List of supported memory interfaces (usually taken from interfaces.py)
-    mem_if_names = py_params_dict["mem_if_names"]
-    attrs = py_params_dict["issuer"]
+    # Get issuer - either from py_params_dict["issuer"] (full dict) or by name from py_params_dict["issuer_name"]
+    issuer = py_params_dict.get("issuer")
+    if issuer is None:
+        issuer_name = py_params_dict.get("issuer_name")
+        if issuer_name:
+            # Dynamically import and setup the issuer
+            import_python_module(
+                os.path.join(find_module_setup_dir(issuer_name), f"{issuer_name}.py")
+            )
+            issuer_module = sys.modules[issuer_name]
+            # Pass relevant py_params to issuer setup
+            issuer_py_params = {
+                k: v
+                for k, v in py_params_dict.items()
+                if k
+                in [
+                    "py2hwsw_version",
+                    "build_dir",
+                    "py2hwsw_target",
+                    "iob_system_params",
+                    "asic_wrapper",
+                ]
+            }
+            issuer = issuer_module.setup(
+                {
+                    "iob_system_params": issuer_py_params.get("iob_system_params", {}),
+                    "py2hwsw_version": issuer_py_params.get(
+                        "py2hwsw_version", "0.81.0"
+                    ),
+                    "build_dir": issuer_py_params.get("build_dir", ""),
+                    "py2hwsw_target": issuer_py_params.get("py2hwsw_target", "setup"),
+                }
+            )
+        else:
+            # Demo mode fallback
+            py_params_dict["mem_if_names"] = []
+            py_params_dict["issuer"] = {
+                "original_name": "iob_core",
+                "name": "iob",
+                "confs": [],
+                "ports": [],
+            }
+            issuer = py_params_dict["issuer"]
+
+    attrs = issuer
+
+    # Determine memory interface names from issuer's ports if not provided
+    mem_if_names = py_params_dict.get("mem_if_names", [])
+    if not mem_if_names:
+        # Auto-detect memory interfaces from issuer's ports
+        for port in attrs.get("ports", []):
+            if isinstance(port["signals"], dict) and "type" in port["signals"]:
+                if port["signals"]["type"] in ["rom_sp", "ram_t2p", "ram_t2p_be"]:
+                    mem_if_names.append(port["signals"]["type"])
 
     attributes_dict = {
         "name": f"{attrs['name']}_mwrap",
@@ -75,7 +126,16 @@ def setup(py_params_dict):
             "parameters": {
                 i["name"]: i["name"]
                 for i in confs_without_groups
-                if i["type"] in ["P", "D"]
+                if i["type"] in ["P", "D"] and not isinstance(i["val"], (dict, list))
+            }
+            | {
+                k: v
+                for k, v in py_params_dict.items()
+                if k
+                in [
+                    "MEM_ASIC",
+                    "MEM_NO_READ_ON_WRITE",
+                ]
             },
             "connect": connect_dict,
         }
@@ -128,6 +188,22 @@ def setup(py_params_dict):
             mem_dict = mem_module.setup({})
             if "MEM_NO_READ_ON_WRITE" in mem_dict["confs"]:
                 extra_params["MEM_NO_READ_ON_WRITE"] = mem_dict["MEM_NO_READ_ON_WRITE"]
+            if "MEM_ASIC" in mem_dict["confs"]:
+                extra_params["MEM_ASIC"] = mem_dict["MEM_ASIC"]
+        if "rom" in type:
+            mem_dir, file_ext = find_module_setup_dir(type)
+            import_python_module(os.path.join(mem_dir, f"{type}.py"))
+            mem_module = sys.modules[type]
+            mem_dict = mem_module.setup({})
+            if "MEM_ASIC" in mem_dict["confs"]:
+                extra_params["MEM_ASIC"] = mem_dict["MEM_ASIC"]
+
+        # Also forward MEM_ASIC from py_params_dict if provided (e.g., from ASIC wrapper)
+        if "MEM_ASIC" in py_params_dict:
+            extra_params["MEM_ASIC"] = py_params_dict["MEM_ASIC"]
+
+        # Use behavioral models during simulation/Verilator lint
+        extra_params["SIMULATION"] = 1
 
         # Add memory instace to subblocks list
         attributes_dict["subblocks"].append(
@@ -165,6 +241,25 @@ def setup(py_params_dict):
                 "min": "0",
                 "max": "1",
                 "descr": "No simultaneous read/write",
+            },
+        ]
+
+    # Add MEM_ASIC to the attributes dictionary
+    # if the user has not set it
+    has_mem_asic_in_attrs = False
+    for conf in confs_without_groups:
+        if conf["name"] == "MEM_ASIC":
+            has_mem_asic_in_attrs = True
+            break
+    if not has_mem_asic_in_attrs:
+        attributes_dict["confs"] += [
+            {
+                "name": "MEM_ASIC",
+                "type": "P",
+                "val": "0",
+                "min": "0",
+                "max": "1",
+                "descr": "Use ASIC hard macros (1) or behavioral RTL (0)",
             },
         ]
 

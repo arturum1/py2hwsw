@@ -67,6 +67,25 @@ DEFAULT_TIMING_VIOLATION_CORNERS = ["*"]
 DEFAULT_IO_DELAY_CONSTRAINT = int(os.environ.get("IO_DELAY_CONSTRAINT", 10))
 
 
+# Sky130 SRAM macro mapping: (addr_width, data_width) -> macro name
+SKY130_MACROS = {
+    # 1RW+1R macros - 32-bit data width
+    (8, 32):  "sky130_sram_1kbyte_1rw1r_32x256_8",   # 1KB, 256x32
+    (9, 32):  "sky130_sram_2kbyte_1rw1r_32x512_8",   # 2KB, 512x32
+    (10, 32): "sky130_sram_4kbyte_1rw1r_32x1024_8",  # 4KB, 1024x32
+    (11, 32): "sky130_sram_8kbyte_1rw1r_32x2048_8",  # 8KB, 2048x32
+    (12, 32): "sky130_sram_16kbyte_1rw1r_32x4096_8", # 16KB, 4096x32
+    (13, 32): "sky130_sram_32kbyte_1rw1r_32x8192_8", # 32KB, 8192x32
+    # 1RW+1R macros - 8-bit data width
+    (8, 8):  "sky130_sram_1kbyte_1rw1r_8x1024_8",    # 1KB, 1024x8
+    (9, 8):  "sky130_sram_2kbyte_1rw1r_8x2048_8",    # 2KB, 2048x8
+    (10, 8): "sky130_sram_4kbyte_1rw1r_8x4096_8",    # 4KB, 4096x8
+    (11, 8): "sky130_sram_8kbyte_1rw1r_8x8192_8",    # 8KB, 8192x8
+    (12, 8): "sky130_sram_16kbyte_1rw1r_8x16384_8",  # 16KB, 16384x8
+    (13, 8): "sky130_sram_32kbyte_1rw1r_8x32768_8",  # 32KB, 32768x8
+}
+
+
 def get_pdk_power_nets(pdk):
     """Return the (VDD_NETS, GND_NETS) of a PDK variant name (e.g. 'sky130A')"""
     for family, nets in PDK_POWER_NETS.items():
@@ -126,6 +145,126 @@ def find_clock_ports(ports):
     return clock_ports
 
 
+def map_memory_to_macro(addr_w, data_w):
+    """Map memory size to nearest sky130 macro (round up).
+    
+    Returns (macro_name, actual_addr_w, actual_data_w)
+    """
+    for (a, d), macro in sorted(SKY130_MACROS.items()):
+        if addr_w <= a and data_w <= d:
+            return macro, a, d
+    raise ValueError(
+        f"No sky130 macro for {addr_w} addr / {data_w} data bits. "
+        f"Available: {list(SKY130_MACROS.keys())}. Consider OpenRAM."
+    )
+
+
+def scan_memories(core):
+    """Scan the core's hierarchy for memory instances.
+    
+    Returns list of dicts with memory info:
+    - instance_name
+    - type (iob_ram_t2p, iob_ram_t2p_be, iob_rom_sp, etc.)
+    - addr_w, data_w
+    - parameters
+    """
+    memories = []
+    
+    def scan_subblocks(subblocks):
+        for subblock in subblocks:
+            # Handle both dict and string elements
+            if isinstance(subblock, str):
+                continue
+            core_name = subblock.get("core", "")
+            if any(mem_type in core_name for mem_type in 
+                   ["iob_ram_t2p", "iob_ram_t2p_be", "iob_rom_sp"]):
+                params = subblock.get("parameters", {})
+                addr_w = int(params.get("ADDR_W", 0))
+                data_w = int(params.get("DATA_W", 32))
+                memories.append({
+                    "instance_name": subblock.get("instance_name", ""),
+                    "type": core_name,
+                    "addr_w": addr_w,
+                    "data_w": data_w,
+                    "parameters": params,
+                })
+            # Recurse into subblocks
+            if "subblocks" in subblock:
+                scan_subblocks(subblock["subblocks"])
+    
+    # Scan from core's attributes_dict (initial setup)
+    if hasattr(core, "attributes_dict"):
+        print(f"DEBUG: iob_system subblocks: {[s.get('core', '') for s in core.attributes_dict.get('subblocks', [])]}")
+        scan_subblocks(core.attributes_dict.get("subblocks", []))
+    
+    # Also scan from core's instantiated subblocks (after generation)
+    if hasattr(core, "subblocks"):
+        print(f"DEBUG: core.subblocks count: {len(core.subblocks)}")
+        for subblock in core.subblocks:
+            core_name = getattr(subblock, "original_name", "") or getattr(subblock, "name", "")
+            print(f"DEBUG: subblock: {core_name}")
+            if hasattr(subblock, "attributes_dict"):
+                subblocks_list = subblock.attributes_dict.get("subblocks", [])
+                print(f"DEBUG:   subblock.attributes_dict subblocks: {[s.get('core', '') if isinstance(s, dict) else s for s in subblocks_list]}")
+                if isinstance(subblocks_list, list):
+                    scan_subblocks(subblocks_list)
+            # Also check the subblock itself
+            if any(mem_type in core_name for mem_type in 
+                   ["iob_ram_t2p", "iob_ram_t2p_be", "iob_rom_sp"]):
+                params = getattr(subblock, "parameters", {})
+                if not params and hasattr(subblock, "attributes_dict"):
+                    # Convert confs list to dict
+                    confs = subblock.attributes_dict.get("confs", [])
+                    params = {c["name"]: c["val"] for c in confs if c["type"] in ["P", "D"]}
+                addr_w = int(params.get("ADDR_W", 0))
+                data_w = int(params.get("DATA_W", 32))
+                memories.append({
+                    "instance_name": getattr(subblock, "instance_name", "") or getattr(subblock, "name", ""),
+                    "type": core_name,
+                    "addr_w": addr_w,
+                    "data_w": data_w,
+                    "parameters": params,
+                })
+    
+    print(f"DEBUG: Found memories: {memories}")
+    
+    # Special handling for iob_system: get memories from iob_system_asic wrapper
+    if hasattr(core, "attributes_dict") and core.attributes_dict.get("is_system"):
+        print(f"DEBUG: Special handling for iob_system, asic_wrapper={core.received_python_parameters.get('asic_wrapper', False)}")
+        if core.received_python_parameters.get("asic_wrapper", False):
+            params = core.received_python_parameters
+            # bootrom memory
+            bootrom_addr_w = params.get("bootrom_addr_w", 12) - 2
+            data_w = params.get("data_w", 32)
+            memories.append({
+                "instance_name": "bootrom_mem_mem",
+                "type": "iob_rom_sp",
+                "addr_w": bootrom_addr_w,
+                "data_w": data_w,
+                "parameters": {"ADDR_W": bootrom_addr_w, "DATA_W": data_w},
+            })
+            # int_mem memory
+            mem_addr_w = params.get("mem_addr_w", 15) - 2
+            memories.append({
+                "instance_name": "int_mem_mem",
+                "type": "iob_ram_t2p_be",
+                "addr_w": mem_addr_w,
+                "data_w": data_w,
+                "parameters": {"ADDR_W": mem_addr_w, "DATA_W": data_w},
+            })
+        print(f"DEBUG: After special handling, memories: {memories}")
+    
+    # Deduplicate by instance_name
+    seen = set()
+    unique_memories = []
+    for mem in memories:
+        if mem["instance_name"] not in seen:
+            seen.add(mem["instance_name"])
+            unique_memories.append(mem)
+    
+    return unique_memories
+
+
 def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
     """Build the default LibreLane configuration dictionary for a core.
 
@@ -134,14 +273,38 @@ def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
     :param clock_period: clock period (ns) of the main clock domain
     :param extra_config: dictionary merged into (and overriding) the result
     """
-    verilog_path = os.path.join(core.build_dir, "hardware", "src", f"{core.name}.v")
-    clock_ports = find_clock_ports(get_top_module_ports(verilog_path, core.name))
+    # For iob_system with ASIC wrapper, use the ASIC wrapper as top module
+    top_name = core.name
+    verilog_dir = os.path.join(core.build_dir, "hardware", "src")
+    if hasattr(core, "attributes_dict") and core.attributes_dict.get("is_system"):
+        # Check if ASIC wrapper is enabled
+        if core.received_python_parameters.get("asic_wrapper", False):
+            top_name = f"{core.name}_asic"
+            verilog_dir = os.path.join(core.build_dir, "hardware", "asic")
+    
+    verilog_path = os.path.join(verilog_dir, f"{top_name}.v")
+    clock_ports = find_clock_ports(get_top_module_ports(verilog_path, top_name))
     vdd_nets, gnd_nets = get_pdk_power_nets(pdk)
 
+    # Scan memories and map to macros
+    memories = scan_memories(core)
+    print(f"DEBUG get_default_config: memories from scan_memories: {memories}")
+    macros = []
+    for mem in memories:
+        macro_name, macro_addr_w, macro_data_w = map_memory_to_macro(
+            mem["addr_w"], mem["data_w"]
+        )
+        macros.append({
+            "macro_name": mem["instance_name"],
+            "lib_name": macro_name,
+            "placement": "auto",
+        })
+    print(f"DEBUG get_default_config: macros: {macros}")
+
     config = {
-        "DESIGN_NAME": core.name,
-        "VERILOG_FILES": ["dir::../src/*.v"],
-        "VERILOG_INCLUDE_DIRS": ["dir::../src"],
+        "DESIGN_NAME": top_name,
+        "VERILOG_FILES": ["dir::../src/*.v", "dir::*.v"],
+        "VERILOG_INCLUDE_DIRS": ["dir::../src", "dir::."],
         "PDK": pdk,
         "CLOCK_PORT": clock_ports if len(clock_ports) > 1 else clock_ports[0],
         "CLOCK_PERIOD": clock_period,
@@ -156,6 +319,10 @@ def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
         "TIMING_VIOLATION_CORNERS": DEFAULT_TIMING_VIOLATION_CORNERS,
         "LINTER_DISABLE_WARNINGS": DEFAULT_LINTER_DISABLE_WARNINGS,
     }
+    if macros:
+        config["MACRO"] = macros
+    # Note: sky130 SRAM macros are part of the PDK and auto-detected from Verilog instantiations
+    # But we specify them in config for explicit placement control
     config.update(extra_config or {})
     return config
 

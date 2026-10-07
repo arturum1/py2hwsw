@@ -109,6 +109,18 @@ def append_board_wrappers(attributes_dict, params):
             },
         )
 
+    # Add ASIC wrapper if requested
+    if params.get("asic_wrapper", False):
+        attributes_dict["superblocks"].append(
+            {
+                "core": "iob_system_asic",
+                "instance_name": "iob_system_asic",
+                "instance_description": "ASIC wrapper (defines MEM_ASIC=1)",
+                "dest_dir": "hardware/asic",
+                "iob_system_params": params,
+            },
+        )
+
 
 def handle_system_overrides(attributes_dict, py_params):
     """Override/append attributes given in `system_attributes` python parameter (usually by child core).

@@ -116,13 +116,7 @@ ifneq ($(wildcard vivado.tex),)
 AMD_FPGA:=1
 endif
 
-# The ASIC flow writes its results to 'tsrc/asic.tex' (see
-# hardware/asic/asic_report.py)
-ifneq ($(wildcard tsrc/asic.tex),)
-ASIC_NODE:=asic
-endif
-
-RESULTS = $(INTEL_FPGA)$(AMD_FPGA)$(ASIC)
+RESULTS = $(INTEL_FPGA)$(AMD_FPGA)$(UMC130_ASIC)
 
 rntop.tex:
 	make doctop DOC=rn
