@@ -39,6 +39,14 @@ def setup(py_params_dict):
                 "max": "1",
                 "descr": "Use ASIC hard macros (1) or behavioral RTL (0)",
             },
+            {
+                "name": "SIMULATION",
+                "type": "P",
+                "val": "1",
+                "min": "0",
+                "max": "1",
+                "descr": "Use behavioral model for simulation (1) or sky130 macros (0)",
+            },
         ],
         "ports": [
             {
@@ -55,12 +63,19 @@ def setup(py_params_dict):
             {
                 "verilog_code": """
     generate
-        if (MEM_ASIC) begin : g_asic
+        if (MEM_ASIC && !SIMULATION) begin : g_asic
             // ASIC hard macro wrapper (sky130 1RW+1R SRAM)
             // Map write port -> Port 0 (RW), read port -> Port 1 (R)
+            // Declare the power nets here so they are not implicit wires. The
+            // hard macro power pins are only connected by the wrapper when the
+            // USE_POWER_PINS define is set (LibreLane enables it by default and
+            // connects the macro power pins through the PDN/VDD_NETS).
+            wire VPWR;
+            wire VGND;
             sram_1rw1r_wrapper #(
                 .ADDR_WIDTH(ADDR_W),
-                .DATA_WIDTH(DATA_W)
+                .DATA_WIDTH(DATA_W),
+                .SIMULATION(0)
             ) u_sram (
                 .clk(clk_i),
                 // Port 0 (RW): used for write operations
@@ -74,7 +89,8 @@ def setup(py_params_dict):
                 .csb1(~r_en_i),
                 .addr1(r_addr_i),
                 .dout1(r_data_o),
-                .VPWR(VPWR), .VGND(VGND)
+                .VPWR(VPWR),
+                .VGND(VGND)
             );
         end else begin : g_behavioral
             // Declare the RAM

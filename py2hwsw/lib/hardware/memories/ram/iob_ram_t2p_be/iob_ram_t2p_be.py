@@ -88,9 +88,16 @@ def setup(py_params_dict):
         if (MEM_ASIC && !SIMULATION) begin : g_asic
             // ASIC hard macro wrapper (sky130 1RW+1R SRAM with byte enable)
             // Map write port -> Port 0 (RW), read port -> Port 1 (R)
+            // Declare the power nets here so they are not implicit wires. The
+            // hard macro power pins are only connected by the wrapper when the
+            // USE_POWER_PINS define is set (LibreLane enables it by default and
+            // connects the macro power pins through the PDN/VDD_NETS).
+            wire VPWR;
+            wire VGND;
             sram_1rw1r_wrapper #(
                 .ADDR_WIDTH(ADDR_W),
-                .DATA_WIDTH(DATA_W)
+                .DATA_WIDTH(DATA_W),
+                .SIMULATION(0)
             ) u_sram (
                 .clk(clk_i),
                 // Port 0 (RW): used for write operations with byte enable
@@ -104,7 +111,8 @@ def setup(py_params_dict):
                 .csb1(~r_en_i),
                 .addr1(r_addr_i),
                 .dout1(r_data_o),
-                .VPWR(VPWR), .VGND(VGND)
+                .VPWR(VPWR),
+                .VGND(VGND)
             );
         end else begin : g_behavioral
             genvar i;

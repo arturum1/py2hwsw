@@ -305,6 +305,11 @@ def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
         "DESIGN_NAME": top_name,
         "VERILOG_FILES": ["dir::../src/*.v", "dir::*.v"],
         "VERILOG_INCLUDE_DIRS": ["dir::../src", "dir::."],
+        # Define IOB_MEM_ASIC so memories that cannot receive Verilog
+        # parameters (e.g. the SpinalHDL-generated memories of iob_vexriscv,
+        # which instantiate the Ram_1w_1rs adapter) select their ASIC hard
+        # macro implementation instead of the behavioral RTL model.
+        "VERILOG_DEFINES": ["IOB_MEM_ASIC"],
         "PDK": pdk,
         "CLOCK_PORT": clock_ports if len(clock_ports) > 1 else clock_ports[0],
         "CLOCK_PERIOD": clock_period,
