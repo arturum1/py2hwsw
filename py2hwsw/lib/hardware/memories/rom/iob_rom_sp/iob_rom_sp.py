@@ -47,14 +47,6 @@ def setup(py_params_dict):
                 "max": "1",
                 "descr": "Use ASIC hard macros (1) or behavioral RTL (0)",
             },
-            {
-                "name": "SIMULATION",
-                "type": "P",
-                "val": "0",
-                "min": "0",
-                "max": "1",
-                "descr": "Use behavioral model for simulation (1) or sky130 macros (0)",
-            },
         ],
         "ports": [
             {
@@ -79,7 +71,7 @@ def setup(py_params_dict):
                 .ADDR_W(ADDR_W),
                 .DATA_W(DATA_W),
                 .HEXFILE(MEM_INIT_FILE_INT),
-                .SIMULATION(SIMULATION)
+                .SIMULATION(0)
             ) u_bootrom (
                 .clk(clk_i),
                 .addr(addr_i),

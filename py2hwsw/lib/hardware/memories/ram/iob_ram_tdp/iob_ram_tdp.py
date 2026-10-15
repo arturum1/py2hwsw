@@ -55,14 +55,6 @@ def setup(py_params_dict):
                 "max": "1",
                 "descr": "Use ASIC hard macros (1) or behavioral RTL (0)",
             },
-            {
-                "name": "SIMULATION",
-                "type": "P",
-                "val": "1",
-                "min": "0",
-                "max": "1",
-                "descr": "Use behavioral model for simulation (1) or sky130 macros (0)",
-            },
         ],
         "ports": [
             {
@@ -101,7 +93,7 @@ def setup(py_params_dict):
     localparam INIT_RAM = (MEM_INIT_FILE_INT != "none") ? 1 : 0;
 
     generate
-        if (MEM_ASIC && !SIMULATION) begin : g_asic
+        if (MEM_ASIC) begin : g_asic
             // ASIC hard macro wrapper (sky130 1RW+1R SRAM x2 for true dual port)
             // Port A -> SRAM 0 (RW), Port B -> SRAM 1 (RW)
             // Both SRAMs share the same memory array conceptually

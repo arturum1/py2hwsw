@@ -10,6 +10,22 @@ from iob_base import find_obj_in_list, import_python_module
 from iob_core import find_module_setup_dir
 
 
+def get_conf_names(confs):
+    """Return the list of conf names, flattening conf groups.
+
+    :param list confs: List of conf dicts (may contain groups with a nested
+        "confs" key).
+    :return: List of conf name strings.
+    """
+    names = []
+    for conf in confs:
+        if "confs" in conf:
+            names += get_conf_names(conf["confs"])
+        else:
+            names.append(conf["name"])
+    return names
+
+
 def setup(py_params_dict):
     """Memory wrapper core. Inteended to be used as a superblock of other cores.
     Required memories are automatically generated based on the ports of the issuer (subblock).
@@ -178,32 +194,22 @@ def setup(py_params_dict):
             }
         )
 
-        # Extra Verilog parameters for this memory subblock
+        # Extra Verilog parameters for this memory subblock.
+        # Forward MEM_ASIC (and MEM_NO_READ_ON_WRITE for RAMs) from the wrapper
+        # confs so the memory follows the wrapper's configuration. The memory
+        # primitives select behavioral RTL vs ASIC hard macros with MEM_ASIC
+        # alone, so SIMULATION is not forwarded to them.
         extra_params = {}
-        if "ram" in type:
-            # check if memory module has MEM_NO_READ_ON_WRITE conf
+        if "ram" in type or "rom" in type:
             mem_dir, file_ext = find_module_setup_dir(type)
             import_python_module(os.path.join(mem_dir, f"{type}.py"))
             mem_module = sys.modules[type]
             mem_dict = mem_module.setup({})
-            if "MEM_NO_READ_ON_WRITE" in mem_dict["confs"]:
-                extra_params["MEM_NO_READ_ON_WRITE"] = mem_dict["MEM_NO_READ_ON_WRITE"]
-            if "MEM_ASIC" in mem_dict["confs"]:
-                extra_params["MEM_ASIC"] = mem_dict["MEM_ASIC"]
-        if "rom" in type:
-            mem_dir, file_ext = find_module_setup_dir(type)
-            import_python_module(os.path.join(mem_dir, f"{type}.py"))
-            mem_module = sys.modules[type]
-            mem_dict = mem_module.setup({})
-            if "MEM_ASIC" in mem_dict["confs"]:
-                extra_params["MEM_ASIC"] = mem_dict["MEM_ASIC"]
-
-        # Also forward MEM_ASIC from py_params_dict if provided (e.g., from ASIC wrapper)
-        if "MEM_ASIC" in py_params_dict:
-            extra_params["MEM_ASIC"] = py_params_dict["MEM_ASIC"]
-
-        # Use behavioral models during simulation/Verilator lint
-        extra_params["SIMULATION"] = 1
+            mem_conf_names = get_conf_names(mem_dict.get("confs", []))
+            if "MEM_ASIC" in mem_conf_names:
+                extra_params["MEM_ASIC"] = "MEM_ASIC"
+            if "MEM_NO_READ_ON_WRITE" in mem_conf_names:
+                extra_params["MEM_NO_READ_ON_WRITE"] = "MEM_NO_READ_ON_WRITE"
 
         # Add memory instace to subblocks list
         attributes_dict["subblocks"].append(
