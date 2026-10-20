@@ -26,6 +26,72 @@ def get_conf_names(confs):
     return names
 
 
+def generate_zero_mem_init(build_dir, mem_name, mem_type, addr_w, data_w):
+    """Generate zero-initialized hex file(s) for a memory.
+
+    The generated files are placed in the simulation and (symlinked) fpga
+    build directories. The value returned matches what each primitive expects
+    as its `HEXFILE` parameter:
+      - memories that pass `HEXFILE` straight to `$readmemh` (`ram_t2p`,
+        `ram_tdp`, `ram_sp`, ...) expect the full file name, so the returned
+        value includes the `.hex` suffix;
+      - memories that build the file name from `HEXFILE` (`rom_sp` appends
+        `.hex`; `ram_t2p_be` appends `_<lane>.hex`) expect the base name
+        without suffix, one file per byte lane (lane 0 = least significant).
+
+    :param str build_dir: Build directory (hex files are generated under
+        `hardware/simulation`).
+    :param str mem_name: Base name of the generated hex file(s).
+    :param str mem_type: py2hwsw memory interface type (e.g. "ram_t2p").
+    :param int addr_w: Address width (word count = 2**addr_w).
+    :param int data_w: Data width in bits.
+    :return: The value to pass to the memory `HEXFILE` parameter.
+    """
+    n_words = 2**addr_w
+    n_lanes = data_w // 8 if data_w % 8 == 0 else 1
+
+    # Byte-enable memories split the contents into one file per byte lane and
+    # expect the base name (they append "_<lane>.hex" themselves).
+    if "be" in mem_type:
+        for lane in range(n_lanes):
+            lines = "".join("00\n" for _ in range(n_words))
+            _write_hex_file(build_dir, f"{mem_name}_{lane}", lines)
+        return mem_name
+
+    # Single-file memories. `rom_sp` appends ".hex" to HEXFILE itself, so it
+    # expects the base name; the others expect the full file name.
+    word_width = data_w // 4 if data_w % 4 == 0 else 2 * ((data_w + 7) // 8)
+    lines = "".join("0" * word_width + "\n" for _ in range(n_words))
+    _write_hex_file(build_dir, mem_name, lines)
+
+    if "rom" in mem_type:
+        return mem_name
+    return f"{mem_name}.hex"
+
+
+def _write_hex_file(build_dir, name, contents):
+    """Write a hex file to the simulation dir and symlink it in the fpga dir.
+
+    :param str build_dir: Build directory.
+    :param str name: File base name (without `.hex`).
+    :param str contents: File contents.
+    """
+    if not build_dir:
+        return
+    sim_dir = os.path.join(build_dir, "hardware/simulation")
+    fpga_dir = os.path.join(build_dir, "hardware/fpga")
+    os.makedirs(sim_dir, exist_ok=True)
+    os.makedirs(fpga_dir, exist_ok=True)
+
+    sim_file = os.path.join(sim_dir, f"{name}.hex")
+    with open(sim_file, "w") as f:
+        f.write(contents)
+
+    fpga_file = os.path.join(fpga_dir, f"{name}.hex")
+    if not os.path.exists(fpga_file):
+        os.symlink(f"../simulation/{name}.hex", fpga_file)
+
+
 def setup(py_params_dict):
     """Memory wrapper core. Inteended to be used as a superblock of other cores.
     Required memories are automatically generated based on the ports of the issuer (subblock).
@@ -175,13 +241,25 @@ def setup(py_params_dict):
         # Address bus width
         word_addr_w = wire["signals"].get("ADDR_W", 32)
         # Memory init hexfile name
-        hexfile_param = f"{prefix_str.upper()}HEXFILE"
-        hexfile_obj = find_obj_in_list(confs_without_groups, hexfile_param)
+        # If the issuer declares a `<PREFIX>HEXFILE` conf, use it as the
+        # initialization file. Otherwise default to a zero-initialized memory,
+        # so that 4-state simulators (icarus, xsim) do not leave the memory
+        # contents as `X` and propagate unknowns through the design.
+        hexfile_conf_name = f"{prefix_str.upper()}HEXFILE"
+        hexfile_obj = find_obj_in_list(confs_without_groups, hexfile_conf_name)
         if hexfile_obj is None:
-            hexfile = "none"
-            hexfile_param = '"none"'
+            # Generate zero-init hex file(s) for this memory.
+            hexfile = generate_zero_mem_init(
+                py_params_dict.get("build_dir", ""),
+                name,
+                signals_type,
+                word_addr_w,
+                data_w,
+            )
+            hexfile_param = f'"{hexfile}"'
         else:
             hexfile = hexfile_obj["val"]
+            hexfile_param = hexfile_conf_name
 
         # Add memory instance to list
         list_of_mems.append(
