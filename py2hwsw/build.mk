@@ -139,6 +139,52 @@ syn-clean:
 syn-test: syn-clean syn-build
 
 #
+# ASIC
+#
+ASIC_DIR=hardware/asic
+# The ASIC flow requires the 'librelane' tool (see py2hwsw/lib/default.nix)
+ASIC_AVAILABLE := $(shell which librelane 2>/dev/null)
+# Process design kit variant (e.g. sky130A) and clock period (ns) of the
+# design's main clock domain. These override the values in the generated
+# 'hardware/asic/config.json'.
+ASIC_PDK ?= sky130A
+CLOCK_PERIOD ?= 10
+# Extra flags forwarded to the ASIC flow makefile
+ASIC_FLAGS ?=
+
+asic-build:
+	make -C $(ASIC_DIR) build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) $(ASIC_FLAGS)
+
+asic-drc:
+	make -C $(ASIC_DIR) drc ASIC_PDK=$(ASIC_PDK)
+
+asic-lvs:
+	make -C $(ASIC_DIR) lvs ASIC_PDK=$(ASIC_PDK)
+
+asic-sta:
+	make -C $(ASIC_DIR) sta ASIC_PDK=$(ASIC_PDK)
+
+asic-gui:
+	make -C $(ASIC_DIR) gui ASIC_PDK=$(ASIC_PDK)
+
+asic-sim:
+	make -C $(ASIC_DIR) sim-run ASIC_PDK=$(ASIC_PDK)
+
+asic-report:
+	make -C $(ASIC_DIR) report
+
+asic-clean:
+	if [ -f "$(ASIC_DIR)/Makefile" ]; then make -C $(ASIC_DIR) clean; fi
+
+# The ASIC flow is only part of the test suite if the tool is available
+ifeq ($(ASIC_AVAILABLE),)
+asic-test:
+	@echo "Note: Skipping ASIC test, 'librelane' not found in PATH."
+else
+asic-test: asic-build asic-report asic-sim
+endif
+
+#
 # DOCUMENT
 #
 DOC_DIR=document
@@ -169,7 +215,7 @@ test: sim-test fpga-test doc-test
 
 ptest: dtest lint-test sim-cov
 
-dtest: test syn-test 
+dtest: test syn-test asic-test 
 
 
 
@@ -177,7 +223,7 @@ dtest: test syn-test
 # CLEAN
 #
 
-clean: sw-clean pc-emul-clean lint-clean sim-clean fpga-clean syn-clean doc-clean
+clean: sw-clean pc-emul-clean lint-clean sim-clean fpga-clean syn-clean asic-clean doc-clean
 
 
 .PHONY: sw-build sw-clean \
@@ -185,6 +231,8 @@ clean: sw-clean pc-emul-clean lint-clean sim-clean fpga-clean syn-clean doc-clea
 	lint-test lint-run lint-clean \
 	sim-build sim-run sim-debug sim-clean \
 	fpga-build fpga-debug fpga-gui fpga-clean \
+	syn-build syn-clean \
+	asic-build asic-drc asic-lvs asic-sta asic-gui asic-sim asic-report asic-clean \
 	doc-build doc-view doc-debug doc-test doc-clean \
 	test clean debug
 

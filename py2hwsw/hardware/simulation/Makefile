@@ -19,14 +19,14 @@ PYTHON_DIR = ../../scripts
 
 #include simulation headers and sources
 VHDR+=$(wildcard ./src/*.vh)
-VSRC+=$(wildcard ./src/*.v)
 
+ifeq ($(SYN),)
+VSRC+=$(wildcard ./src/*.v)
 # This will catch uvm sources inadvertently
 # VHDR+=$(wildcard ./src/*.svh)
 # ALL:=$(wildcard ./src/*.sv)
 # VSRC:=$(VSRC) $(filter %_pkg.sv, $(ALL)) $(filter-out %_pkg.sv, $(ALL))
 
-ifeq ($(SYN),)
 #include the module's headers and sources
 VHDR+=$(wildcard ../src/*.vh)
 VSRC+=$(wildcard ../src/*.v)
@@ -40,11 +40,32 @@ VHDR+=$(wildcard ../common_src/*.svh)
 ALL:=$(wildcard ../common_src/*.sv)
 VSRC:=$(VSRC) $(filter %_pkg.sv, $(ALL)) $(filter-out %_pkg.sv, $(ALL))
 else
+# Gate-level simulation, of a netlist produced by another flow. The 'GATE_SYN_DIR'
+# variable selects the directory that holds the netlist and the cell models
+# ('syn' for post-synthesis, 'asic' for post-place-and-route).
+GATE_SYN_DIR?=syn
 NODE ?= umc130
-include ../syn/$(NODE)/sim.mk
-VSRC+= ../syn/results/*.v
-../syn/%.v:
-	make -C ../syn build
+include ../$(GATE_SYN_DIR)/$(NODE)/sim.mk
+GATE_NETLIST ?= ../$(GATE_SYN_DIR)/results/*.v
+VSRC+= $(GATE_NETLIST)
+# The testbench of the core may include the configuration headers of the core,
+# which are not needed by the netlist, but are needed to compile it
+VHDR+=$(wildcard ../src/*.vh)
+# The 'sim.mk' segment above can request Verilog macros for the cell models
+# ('GATE_DEFINES'), which each simulator defines with its own flag
+ifneq ($(strip $(GATE_DEFINES)),)
+ifeq ($(SIMULATOR),$(filter $(SIMULATOR),icarus verilator))
+VFLAGS+=$(addprefix -D,$(GATE_DEFINES))
+else ifeq ($(SIMULATOR),$(filter $(SIMULATOR),vcs questa))
+VFLAGS+=$(addprefix +define+,$(GATE_DEFINES))
+else ifeq ($(SIMULATOR),xcelium)
+VFLAGS+=$(addprefix -define ,$(GATE_DEFINES))
+else ifeq ($(SIMULATOR),xsim)
+VFLAGS+=$(addprefix -d ,$(GATE_DEFINES))
+endif
+endif
+../$(GATE_SYN_DIR)/%.v:
+	make -C ../$(GATE_SYN_DIR) build
 endif
 
 #include local simulation segment
@@ -70,6 +91,8 @@ TB?=iob_v_uvm_tb
 endif
 $(info Testbench is $(TB).v)
 
+VTOP=$(TB)
+
 #
 # Include the simulator stub
 #
@@ -93,11 +116,19 @@ endif
 #choose tetsbench type: C, verilog, uvm or none
 ifeq ($(TBTYPE),V)
 VSRC:=$(filter-out ./src/iob_v_tb.v, $(VSRC))
+VSRC:=$(filter-out ./src/iob_ctls_tb.v, $(VSRC))
+# In gate-level mode the testbench sources are not picked up by the wildcard
+# above, so the selected testbench is added explicitly. In RTL mode it is
+# already part of the wildcard, and adding it again would break the compile.
+ifeq ($(filter ./src/$(TB).v,$(VSRC)),)
+VSRC+= ./src/$(TB).v
+endif
 endif
 
 ifeq ($(TBTYPE),UVM)
 VSRC:=$(filter-out ./src/iob_v_tb.v, $(VSRC))
 VSRC:=$(filter-out ./src/$(NAME)_tb.v, $(VSRC))
+VSRC:=$(filter-out ./src/iob_ctls_tb.v, $(VSRC))
 SIMULATOR:=xcelium
 endif
 

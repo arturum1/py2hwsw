@@ -348,14 +348,22 @@ class iob_core(iob_module, iob_instance):
         # Lint and format sources
         if self.is_top_module:
             self.lint_and_format()
-        # Generate ASIC config.json if ASIC flow is enabled
-        if self.is_top_module and self.received_python_parameters.get("asic_wrapper", False):
+        # Generate the ASIC (LibreLane) flow configuration
+        if self.is_top_module:
             try:
                 from asic_config_gen import asic_config_gen
                 asic_config_gen(self)
             except Exception as e:
                 import traceback
                 print(f"{iob_colors.WARNING} ASIC config generation failed: {e}{iob_colors.ENDC}")
+                traceback.print_exc()
+            # Run the core's 'hardware/asic/asic_setup.py', if it exists, so
+            # that it can adjust the generated configuration.
+            try:
+                setup_srcs.run_setup_functions(self, "asic_setup", setup_module=self)
+            except Exception as e:
+                import traceback
+                print(f"{iob_colors.WARNING} ASIC setup function failed: {e}{iob_colors.ENDC}")
                 traceback.print_exc()
         print(
             f"{iob_colors.INFO}Setup of '{self.original_name}' core successful. Generated build directory: '{self.build_dir}'.{iob_colors.ENDC}"

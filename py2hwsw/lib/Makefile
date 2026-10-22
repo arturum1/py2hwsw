@@ -49,6 +49,16 @@ endif
 # Remove first char (:) from PY_PARAMS
 PY_PARAMS:=$(shell echo $(PY_PARAMS) | cut -c2-)
 
+# Parameters used by the setup of the ASIC flow (see below). The ASIC flow
+# uses the ASIC wrapper of the core (e.g. 'iob_system_asic'), which adapts the
+# design to the requirements of the flow (hard macros for the memories, power
+# nets, etc.). Set 'ASIC_WRAPPER=0' to disable it.
+ASIC_WRAPPER?=1
+ASIC_PY_PARAMS:=$(PY_PARAMS):asic_wrapper=$(ASIC_WRAPPER)
+ASIC_PY_PARAMS:=$(shell echo $(ASIC_PY_PARAMS) | sed 's/^://')
+# Parameters used by the default setup. Overridden by the ASIC targets.
+SETUP_PY_PARAMS?=$(PY_PARAMS)
+
 # List of lib cores that pass linter checks. This list will be deprecated when all lib cores pass linter checks.
 #CORES_READY_FOR_LINT=iob_pulse_gen iob_and iob_aoi iob_timer iob_uart
 CORES_READY_FOR_LINT=iob_pulse_gen iob_and iob_aoi iob_uart
@@ -65,7 +75,7 @@ endif
 all: sim-test
 
 setup:
-	nix-shell --run "py2hwsw $(CORE) setup --build_dir '$(BUILD_DIR)' --py_params '$(PY_PARAMS)' $(SETUP_ARGS)"
+	nix-shell --run "py2hwsw $(CORE) setup --build_dir '$(BUILD_DIR)' --py_params '$(SETUP_PY_PARAMS)' $(SETUP_ARGS)"
 
 sim-build: clean setup
 	nix-shell --run "make -C $(BUILD_DIR) sim-build"
@@ -92,6 +102,7 @@ fpga-run: fpga-build
 # ASIC_FLAGS: extra flags forwarded to the ASIC flow makefile
 ASIC_PDK?=sky130A
 CLOCK_PERIOD?=10
+asic-build: SETUP_PY_PARAMS=$(ASIC_PY_PARAMS)
 asic-build: clean setup
 	nix-shell --run "make -C $(BUILD_DIR) asic-build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) $(ASIC_FLAGS)"
 
@@ -105,6 +116,10 @@ asic-lvs: asic-build
 
 asic-sta: asic-build
 	nix-shell --run "make -C $(BUILD_DIR) asic-sta ASIC_PDK=$(ASIC_PDK)"
+
+# Interactive viewer of the layout of the last run
+asic-gui: asic-build
+	nix-shell --run "make -C $(BUILD_DIR) asic-gui ASIC_PDK=$(ASIC_PDK)"
 
 # Gate-level simulation of the place-and-route netlist, with the core's testbench
 asic-sim: asic-build

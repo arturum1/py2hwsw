@@ -3,9 +3,56 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Parameterized wrapper for sky130 1RW+1R SRAM macros.
-// Selects the appropriate macro based on address/data width.
-// When SIMULATION=1, uses behavioral model (for Verilator lint/sim).
-// When SIMULATION=0, instantiates sky130 hard macros.
+//
+// The hard macro is only used when its geometry matches the requested one
+// exactly, because the address and data widths of the macro ports are fixed.
+// Memories with any other geometry are implemented with a behavioral model,
+// which the synthesis flow maps to standard cells.
+//
+// Keep the list of macros in sync with 'SKY130_MACROS' in
+// 'py2hwsw/scripts/asic_config_gen.py', which adds the views (GDSII, LEF and
+// Verilog model) of the macros to the configuration of the ASIC flow.
+
+module sram_1rw1r_behavioral #(
+    parameter ADDR_WIDTH = 8,
+    parameter DATA_WIDTH = 32
+) (
+    input  logic                    clk,
+    // Port 0: RW
+    input  logic                    csb0,
+    input  logic                    web0,
+    input  logic [DATA_WIDTH/8-1:0] wmask0,
+    input  logic [ADDR_WIDTH-1:0]   addr0,
+    input  logic [DATA_WIDTH-1:0]   din0,
+    output logic [DATA_WIDTH-1:0]   dout0,
+    // Port 1: R
+    input  logic                    csb1,
+    input  logic [ADDR_WIDTH-1:0]   addr1,
+    output logic [DATA_WIDTH-1:0]   dout1
+);
+
+    // Number of byte write enables
+    localparam WMASK_W = DATA_WIDTH/8;
+
+    logic [DATA_WIDTH-1:0] mem [0:(1<<ADDR_WIDTH)-1];
+
+    always_ff @(posedge clk) begin
+        // Write port (port 0)
+        if (!csb0 && !web0) begin
+            for (int i = 0; i < DATA_WIDTH; i = i + 1) begin
+                // The bits of a word whose width is not a multiple of 8 are
+                // masked by the last byte enable, which is the most precise
+                // granularity available
+                if (wmask0[(i/8) < WMASK_W ? (i/8) : WMASK_W-1])
+                    mem[addr0][i] <= din0[i];
+            end
+        end
+        // Read ports
+        if (!csb0 && web0) dout0 <= mem[addr0];
+        if (!csb1)         dout1 <= mem[addr1];
+    end
+
+endmodule
 
 module sram_1rw1r_wrapper #(
     parameter ADDR_WIDTH = 8,
@@ -29,157 +76,72 @@ module sram_1rw1r_wrapper #(
     inout VGND
 );
 
-    // Select macro based on address/data width
-    // sky130 1RW+1R SRAM macros: 32-bit data width variants
-    // 1KB: 256x32 (ADDR_WIDTH=8), 2KB: 512x32 (ADDR_WIDTH=9), 4KB: 1024x32 (ADDR_WIDTH=10)
-    // 8KB: 2048x32 (ADDR_WIDTH=11), 16KB: 4096x32 (ADDR_WIDTH=12), 32KB: 8192x32 (ADDR_WIDTH=13)
-    localparam MACRO_1KB_32  = "sky130_sram_1kbyte_1rw1r_32x256_8";
-    localparam MACRO_2KB_32  = "sky130_sram_2kbyte_1rw1r_32x512_8";
-    localparam MACRO_4KB_32  = "sky130_sram_4kbyte_1rw1r_32x1024_8";
-    localparam MACRO_8KB_32  = "sky130_sram_8kbyte_1rw1r_32x2048_8";
-    localparam MACRO_16KB_32 = "sky130_sram_16kbyte_1rw1r_32x4096_8";
-    localparam MACRO_32KB_32 = "sky130_sram_32kbyte_1rw1r_32x8192_8";
-    localparam MACRO_1KB_8   = "sky130_sram_1kbyte_1rw1r_8x1024_8";
-    localparam MACRO_2KB_8   = "sky130_sram_2kbyte_1rw1r_8x2048_8";
-    localparam MACRO_4KB_8   = "sky130_sram_4kbyte_1rw1r_8x4096_8";
-    localparam MACRO_8KB_8   = "sky130_sram_8kbyte_1rw1r_8x8192_8";
-    localparam MACRO_16KB_8  = "sky130_sram_16kbyte_1rw1r_8x16384_8";
-    localparam MACRO_32KB_8  = "sky130_sram_32kbyte_1rw1r_8x32768_8";
-
-    // Simulation: use behavioral model
-    // Synthesis/ASIC flow: instantiate sky130 hard macros
     generate
         if (SIMULATION) begin : gen_sim
-            // Behavioral fallback
-            logic [DATA_WIDTH-1:0] mem [0:(1<<ADDR_WIDTH)-1];
-            
-            always_ff @(posedge clk) begin
-                if (!csb0 && !web0) begin
-                    for (int i = 0; i < DATA_WIDTH/8; i++) begin
-                        if (wmask0[i])
-                            mem[addr0][i*8 +: 8] <= din0[i*8 +: 8];
-                    end
-                end
-                if (!csb0 && !web0) dout0 <= 'x;
-                else if (!csb0) dout0 <= mem[addr0];
-                
-                if (!csb1) dout1 <= mem[addr1];
-                else dout1 <= 'x;
-            end
+            sram_1rw1r_behavioral #(
+                .ADDR_WIDTH (ADDR_WIDTH),
+                .DATA_WIDTH (DATA_WIDTH)
+            ) u_sram (
+                .clk    (clk),
+                .csb0   (csb0),
+                .web0   (web0),
+                .wmask0 (wmask0),
+                .addr0  (addr0),
+                .din0   (din0),
+                .dout0  (dout0),
+                .csb1   (csb1),
+                .addr1  (addr1),
+                .dout1  (dout1)
+            );
         end else begin : gen_asic
-            // Instantiate the appropriate sky130 macro using generate block
-            if (DATA_WIDTH == 32) begin : gen_32bit
-                if (ADDR_WIDTH <= 8) begin : g_1kb
-                    sky130_sram_1kbyte_1rw1r_32x256_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 9) begin : g_2kb
-                    sky130_sram_2kbyte_1rw1r_32x512_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 10) begin : g_4kb
-                    sky130_sram_4kbyte_1rw1r_32x1024_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 11) begin : g_8kb
-                    sky130_sram_8kbyte_1rw1r_32x2048_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 12) begin : g_16kb
-                    sky130_sram_16kbyte_1rw1r_32x4096_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else begin : g_32kb
-                    sky130_sram_32kbyte_1rw1r_32x8192_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end
-            end else begin : gen_8bit
-                if (ADDR_WIDTH <= 8) begin : g_1kb
-                    sky130_sram_1kbyte_1rw1r_8x1024_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 9) begin : g_2kb
-                    sky130_sram_2kbyte_1rw1r_8x2048_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 10) begin : g_4kb
-                    sky130_sram_4kbyte_1rw1r_8x4096_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 11) begin : g_8kb
-                    sky130_sram_8kbyte_1rw1r_8x8192_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else if (ADDR_WIDTH <= 12) begin : g_16kb
-                    sky130_sram_16kbyte_1rw1r_8x16384_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end else begin : g_32kb
-                    sky130_sram_32kbyte_1rw1r_8x32768_8 u_sram (
-                    `ifdef USE_POWER_PINS
-                        .vccd1(VPWR), .vssd1(VGND),
-                    `endif
-                        .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
-                        .addr0(addr0), .din0(din0), .dout0(dout0),
-                        .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
-                    );
-                end
+            // The sky130 1RW+1R SRAM macros of the PDK, with their geometry:
+            //   sky130_sram_1kbyte_1rw1r_32x256_8: 256 words of 32 bits
+            //   sky130_sram_2kbyte_1rw1r_32x512_8: 512 words of 32 bits
+            //   sky130_sram_1kbyte_1rw1r_8x1024_8: 1024 words of 8 bits
+            if ((ADDR_WIDTH == 8) && (DATA_WIDTH == 32)) begin : g_1kbyte_32x256
+                sky130_sram_1kbyte_1rw1r_32x256_8 u_sram (
+                `ifdef USE_POWER_PINS
+                    .vccd1(VPWR), .vssd1(VGND),
+                `endif
+                    .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
+                    .addr0(addr0), .din0(din0), .dout0(dout0),
+                    .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
+                );
+            end else if ((ADDR_WIDTH == 9) && (DATA_WIDTH == 32)) begin : g_2kbyte_32x512
+                sky130_sram_2kbyte_1rw1r_32x512_8 u_sram (
+                `ifdef USE_POWER_PINS
+                    .vccd1(VPWR), .vssd1(VGND),
+                `endif
+                    .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
+                    .addr0(addr0), .din0(din0), .dout0(dout0),
+                    .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
+                );
+            end else if ((ADDR_WIDTH == 10) && (DATA_WIDTH == 8)) begin : g_1kbyte_8x1024
+                sky130_sram_1kbyte_1rw1r_8x1024_8 u_sram (
+                `ifdef USE_POWER_PINS
+                    .vccd1(VPWR), .vssd1(VGND),
+                `endif
+                    .clk0(clk), .csb0(csb0), .web0(web0), .wmask0(wmask0),
+                    .addr0(addr0), .din0(din0), .dout0(dout0),
+                    .clk1(clk), .csb1(csb1), .addr1(addr1), .dout1(dout1)
+                );
+            end else begin : g_behavioral
+                // No macro with this geometry is available
+                sram_1rw1r_behavioral #(
+                    .ADDR_WIDTH (ADDR_WIDTH),
+                    .DATA_WIDTH (DATA_WIDTH)
+                ) u_sram (
+                    .clk    (clk),
+                    .csb0   (csb0),
+                    .web0   (web0),
+                    .wmask0 (wmask0),
+                    .addr0  (addr0),
+                    .din0   (din0),
+                    .dout0  (dout0),
+                    .csb1   (csb1),
+                    .addr1  (addr1),
+                    .dout1  (dout1)
+                );
             end
         end
     endgenerate

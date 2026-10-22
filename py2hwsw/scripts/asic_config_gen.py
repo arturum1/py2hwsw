@@ -11,6 +11,7 @@ The LibreLane configuration (JSON) is written to
 its name, its Verilog sources, its clock, and the technology to use.
 """
 
+import glob
 import json
 import os
 import re
@@ -67,22 +68,16 @@ DEFAULT_TIMING_VIOLATION_CORNERS = ["*"]
 DEFAULT_IO_DELAY_CONSTRAINT = int(os.environ.get("IO_DELAY_CONSTRAINT", 10))
 
 
-# Sky130 SRAM macro mapping: (addr_width, data_width) -> macro name
+# Sky130 SRAM macros available in the PDK, with their geometry.
+# The address and data widths of the ports of a macro are fixed, so a macro
+# can only implement a memory with exactly the same geometry. Keep this table
+# in sync with the macro selection of 'sram_1rw1r_wrapper.v'.
 SKY130_MACROS = {
     # 1RW+1R macros - 32-bit data width
-    (8, 32): "sky130_sram_1kbyte_1rw1r_32x256_8",  # 1KB, 256x32
-    (9, 32): "sky130_sram_2kbyte_1rw1r_32x512_8",  # 2KB, 512x32
-    (10, 32): "sky130_sram_4kbyte_1rw1r_32x1024_8",  # 4KB, 1024x32
-    (11, 32): "sky130_sram_8kbyte_1rw1r_32x2048_8",  # 8KB, 2048x32
-    (12, 32): "sky130_sram_16kbyte_1rw1r_32x4096_8",  # 16KB, 4096x32
-    (13, 32): "sky130_sram_32kbyte_1rw1r_32x8192_8",  # 32KB, 8192x32
+    "sky130_sram_1kbyte_1rw1r_32x256_8": {"addr_width": 8, "data_width": 32},
+    "sky130_sram_2kbyte_1rw1r_32x512_8": {"addr_width": 9, "data_width": 32},
     # 1RW+1R macros - 8-bit data width
-    (8, 8): "sky130_sram_1kbyte_1rw1r_8x1024_8",  # 1KB, 1024x8
-    (9, 8): "sky130_sram_2kbyte_1rw1r_8x2048_8",  # 2KB, 2048x8
-    (10, 8): "sky130_sram_4kbyte_1rw1r_8x4096_8",  # 4KB, 4096x8
-    (11, 8): "sky130_sram_8kbyte_1rw1r_8x8192_8",  # 8KB, 8192x8
-    (12, 8): "sky130_sram_16kbyte_1rw1r_8x16384_8",  # 16KB, 16384x8
-    (13, 8): "sky130_sram_32kbyte_1rw1r_8x32768_8",  # 32KB, 32768x8
+    "sky130_sram_1kbyte_1rw1r_8x1024_8": {"addr_width": 10, "data_width": 8},
 }
 
 
@@ -145,18 +140,115 @@ def find_clock_ports(ports):
     return clock_ports
 
 
-def map_memory_to_macro(addr_w, data_w):
-    """Map memory size to nearest sky130 macro (round up).
+def find_macro(addr_w, data_w):
+    """Return the name of the sky130 macro with exactly this geometry.
 
-    Returns (macro_name, actual_addr_w, actual_data_w)
+    Returns None if the PDK has no macro with the requested geometry, in which
+    case the memory is implemented with standard cells.
     """
-    for (a, d), macro in sorted(SKY130_MACROS.items()):
-        if addr_w <= a and data_w <= d:
-            return macro, a, d
-    raise ValueError(
-        f"No sky130 macro for {addr_w} addr / {data_w} data bits. "
-        f"Available: {list(SKY130_MACROS.keys())}. Consider OpenRAM."
+    for name, geometry in SKY130_MACROS.items():
+        if geometry["addr_width"] == addr_w and geometry["data_width"] == data_w:
+            return name
+    return None
+
+
+def get_pdk_macros_dir(pdk):
+    """Return the directory with the views of the SRAM macros of a PDK variant.
+
+    Returns None if the PDK does not provide any SRAM macro.
+    """
+    candidates = []
+    if pdk_root := os.environ.get("PDK_ROOT"):
+        candidates.append(
+            os.path.join(pdk_root, pdk, "libs.ref", "sky130_sram_macros")
+        )
+    candidates.append(
+        os.path.join(
+            os.path.expanduser("~"), ".ciel", pdk, "libs.ref", "sky130_sram_macros"
+        )
     )
+    for candidate in candidates:
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+def get_macro_views(macros_dir, macro_name):
+    """Return the views of a macro: GDSII, LEF, Verilog model and Liberty.
+
+    The Verilog model is needed by the synthesis flow to resolve the
+    instantiation of the macro in the RTL, and the Liberty file by the static
+    timing analysis.
+    """
+    views = {"gds": [], "lef": [], "vh": [], "lib": {}}
+
+    gds = os.path.join(macros_dir, "gds", f"{macro_name}.gds")
+    lef = os.path.join(macros_dir, "lef", f"{macro_name}.lef")
+    vh = os.path.join(macros_dir, "verilog", f"{macro_name}.v")
+    if os.path.isfile(gds):
+        views["gds"].append(gds)
+    if os.path.isfile(lef):
+        views["lef"].append(lef)
+    if os.path.isfile(vh):
+        views["vh"].append(vh)
+
+    libs = sorted(
+        glob.glob(os.path.join(macros_dir, "lib", f"{macro_name}_*.lib"))
+    )
+    if libs:
+        views["lib"] = {"*": libs}
+
+    return views
+
+
+def get_macros_config(memories, pdk):
+    """Return the 'MACROS' configuration of the memories of a design.
+
+    Only the memories whose geometry matches the geometry of a macro of the
+    PDK are mapped to that macro. The other memories are implemented with
+    standard cells, which is not an error: it only makes the design bigger.
+    """
+    macros = {}
+
+    if not memories:
+        return macros
+
+    macros_dir = get_pdk_macros_dir(pdk)
+    if macros_dir is None:
+        print(
+            f"{WARNING} The SRAM macros of the PDK '{pdk}' were not found. "
+            f"The memories of the design will be implemented with standard "
+            f"cells.{ENDC}"
+        )
+        return macros
+
+    for mem in memories:
+        if not mem["type"].startswith("iob_ram_"):
+            # The ROMs are always implemented with the behavioral model, so
+            # they never instantiate a hard macro
+            continue
+        macro_name = find_macro(mem["addr_w"], mem["data_w"])
+        if macro_name is None:
+            print(
+                f"{WARNING} The PDK has no SRAM macro with the geometry of the "
+                f"memory '{mem['instance_name']}' ({mem['addr_w']}x{mem['data_w']}). "
+                f"It will be implemented with standard cells.{ENDC}"
+            )
+            continue
+        if macro_name in macros:
+            continue
+        views = get_macro_views(macros_dir, macro_name)
+        if not views["gds"] or not views["lef"]:
+            print(
+                f"{WARNING} The views of the SRAM macro '{macro_name}' are "
+                f"incomplete in '{macros_dir}'. The memory "
+                f"'{mem['instance_name']}' will be implemented with standard "
+                f"cells.{ENDC}"
+            )
+            continue
+        macros[macro_name] = views
+
+    return macros
 
 
 def scan_memories(core):
@@ -236,20 +328,11 @@ def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
     clock_ports = find_clock_ports(get_top_module_ports(verilog_path, top_name))
     vdd_nets, gnd_nets = get_pdk_power_nets(pdk)
 
-    # Scan memories and map to macros
+    # Scan memories and map them to the SRAM macros of the PDK
     memories = scan_memories(core)
-    macros = []
-    for mem in memories:
-        macro_name, macro_addr_w, macro_data_w = map_memory_to_macro(
-            mem["addr_w"], mem["data_w"]
-        )
-        macros.append(
-            {
-                "macro_name": mem["instance_name"],
-                "lib_name": macro_name,
-                "placement": "auto",
-            }
-        )
+    # The memories are only mapped to hard macros in the designs that
+    # instantiate them, which are the ones built with the ASIC wrapper
+    macros = get_macros_config(memories, pdk) if top_name.endswith("_asic") else {}
 
     config = {
         "DESIGN_NAME": top_name,
@@ -268,11 +351,13 @@ def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
         "PL_OPTIMIZE_MIRRORING": bool(int(DEFAULT_PL_OPTIMIZE_MIRRORING)),
         "TIMING_VIOLATION_CORNERS": DEFAULT_TIMING_VIOLATION_CORNERS,
         "LINTER_DISABLE_WARNINGS": DEFAULT_LINTER_DISABLE_WARNINGS,
+        # The Verilator lint step of the flow is only enabled for the cores
+        # that pass the lint checks of the setup. The other cores have
+        # warnings that would abort the flow.
+        "RUN_LINTER": bool(getattr(core, "global_project_vlint", True)),
     }
     if macros:
-        config["MACRO"] = macros
-    # Note: sky130 SRAM macros are part of the PDK and auto-detected from Verilog instantiations
-    # But we specify them in config for explicit placement control
+        config["MACROS"] = macros
     config.update(extra_config or {})
     return config
 

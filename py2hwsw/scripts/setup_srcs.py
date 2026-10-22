@@ -283,6 +283,7 @@ def run_setup_functions(python_module, module_type, **kwargs):
     module_path = {
         "sim_setup": "hardware/simulation/sim_setup.py",
         "fpga_setup": "hardware/fpga/fpga_setup.py",
+        "asic_setup": "hardware/asic/asic_setup.py",
         "sw_setup": "software/sw_setup.py",
         "doc_setup": "document/doc_setup.py",
     }[module_type]
@@ -418,26 +419,9 @@ def asic_setup(python_module):
         src_dir,
         dst_dir,
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns("*.pdf"),
+        ignore=shutil.ignore_patterns("*.pdf", "__pycache__"),
     )
     nix_permission_hack(dst_dir)
-
-    # Copy iob_system ASIC wrapper template if iob_system
-    if hasattr(python_module, "name") and python_module.name == "iob_system":
-        src_wrapper = os.path.join(get_lib_dir(), "iob_system/hardware/asic/iob_system_asic.py")
-        if os.path.isfile(src_wrapper):
-            dst_wrapper = os.path.join(dst_dir, "iob_system_asic.py")
-            shutil.copy2(src_wrapper, dst_wrapper)
-            nix_permission_hack(dst_wrapper)
-        # Also copy the iob_system_asic directory structure if it exists
-        src_wrapper_dir = os.path.join(get_lib_dir(), "iob_system/hardware/asic")
-        if os.path.isdir(src_wrapper_dir):
-            for item in os.listdir(src_wrapper_dir):
-                src_item = os.path.join(src_wrapper_dir, item)
-                dst_item = os.path.join(dst_dir, item)
-                if os.path.isfile(src_item):
-                    shutil.copy2(src_item, dst_item)
-                    nix_permission_hack(dst_item)
 
 
 def lib_module_setup(
@@ -752,6 +736,7 @@ def copy_rename_setup_directory(core, exclude_file_list=["*.py"]):
             "hardware/fpga",
             "hardware/syn",
             "hardware/lint",
+            "hardware/asic",
             "document",
         ]
 
