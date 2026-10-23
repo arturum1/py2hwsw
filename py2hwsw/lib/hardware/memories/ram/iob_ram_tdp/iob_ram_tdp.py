@@ -112,7 +112,8 @@ def setup(py_params_dict):
             sram_1rw1r_wrapper #(
                 .ADDR_WIDTH(ADDR_W),
                 .DATA_WIDTH(DATA_W),
-                .SIMULATION(0)
+                .SIMULATION(0),
+                .MACRO_NAME("")
             ) u_sram_a (
                 .clk(clk_i),
                 // Port 0 (RW): used for Port A
@@ -134,7 +135,8 @@ def setup(py_params_dict):
             sram_1rw1r_wrapper #(
                 .ADDR_WIDTH(ADDR_W),
                 .DATA_WIDTH(DATA_W),
-                .SIMULATION(0)
+                .SIMULATION(0),
+                .MACRO_NAME("")
             ) u_sram_b (
                 .clk(clk_i),
                 // Port 0 (RW): used for Port B writes

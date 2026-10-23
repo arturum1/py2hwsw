@@ -43,7 +43,8 @@ module bootrom_wrapper #(
             sram_1rw1r_wrapper #(
                 .ADDR_WIDTH(ADDR_W),
                 .DATA_WIDTH(DATA_W),
-                .SIMULATION(0)
+                .SIMULATION(0),
+                .MACRO_NAME("")
             ) u_sram (
                 .clk(clk),
                 // Port 0 (RW) - tied off for bootrom (read-only)
