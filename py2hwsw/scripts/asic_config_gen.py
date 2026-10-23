@@ -69,16 +69,14 @@ DEFAULT_IO_DELAY_CONSTRAINT = int(os.environ.get("IO_DELAY_CONSTRAINT", 10))
 
 
 # Sky130 SRAM macros available in the PDK, with their geometry.
-# The address and data widths of the ports of a macro are fixed, so a macro
-# can only implement a memory with exactly the same geometry. Keep this table
-# in sync with the macro selection of 'sram_1rw1r_wrapper.v'.
 SKY130_MACROS = {
-    # 1RW+1R macros - 32-bit data width
     "sky130_sram_1kbyte_1rw1r_32x256_8": {"addr_width": 8, "data_width": 32},
     "sky130_sram_2kbyte_1rw1r_32x512_8": {"addr_width": 9, "data_width": 32},
-    # 1RW+1R macros - 8-bit data width
     "sky130_sram_1kbyte_1rw1r_8x1024_8": {"addr_width": 10, "data_width": 8},
 }
+
+# Memory style: pdk (use PDK stock macros), openram (generate with OpenRAM), behavioral (use std cells)
+MEMORY_STYLE = os.environ.get("ASIC_MEM_STYLE", "pdk")
 
 
 def get_pdk_power_nets(pdk):
@@ -223,9 +221,9 @@ def get_macros_config(memories, pdk):
         return macros
 
     for mem in memories:
+        if MEMORY_STYLE != "pdk":
+            continue
         if not mem["type"].startswith("iob_ram_"):
-            # The ROMs are always implemented with the behavioral model, so
-            # they never instantiate a hard macro
             continue
         macro_name = find_macro(mem["addr_w"], mem["data_w"])
         if macro_name is None:
