@@ -36,7 +36,11 @@
 # kactus2 (commit 19c5702)
 # doxygen-1.16.1
 # librelane-3.0.3
-# ciel-3.10.4
+# openram (commit b2b069c, version 1.2.49)
+# magic-vlsi-8.3.629
+# netgen-vlsi-1.5.319
+# ngspice-45
+# pdk-ciel-2.4.1
 
 let
   # For debug
@@ -74,18 +78,22 @@ let
 
   verilator_v5_040 = import ./scripts/verilator.nix { inherit pkgs; };
 
-  pythonEnv = pkgs.python3.withPackages (ps: with ps; [
-    black
-    mypy
-    parse
-    numpy
-    wavedrom
-    matplotlib
-    scipy
-    pyserial
-    pydantic
-    jinja2
-  ]);
+  openram = import ./scripts/openram.nix { inherit pkgs; };
+
+  pythonEnv = pkgs.python3.withPackages (ps:
+    (with ps; [
+      black
+      mypy
+      parse
+      numpy
+      wavedrom
+      matplotlib
+      scipy
+      pyserial
+      pydantic
+      jinja2
+    ])
+    ++ [ openram ]);
 
   # FuseSoC provided by nixpkgs is not adequate for py2hwsw. Use custom version from GitHub.
   custom_fusesoc = pkgs.python3.pkgs.buildPythonPackage rec {
@@ -216,7 +224,8 @@ let
     (callPackage ./scripts/kactus2.nix { })
     doxygen
     librelane
-    ciel
+    openram
+    pdk-ciel
     py2hwsw
   ] ++ extra_pkgs;
 
