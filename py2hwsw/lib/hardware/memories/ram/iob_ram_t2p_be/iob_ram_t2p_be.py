@@ -73,9 +73,9 @@ def setup(py_params_dict):
                 "instantiate": False,
             },
         ],
-    "snippets": [
-        {
-            "verilog_code": """
+        "snippets": [
+            {
+                "verilog_code": """
     generate
         if (MEM_ASIC) begin : g_asic
             // ASIC hard macro wrapper (sky130 1RW+1R SRAM with byte enable)
@@ -85,8 +85,8 @@ def setup(py_params_dict):
             sram_1rw1r_wrapper #(
                 .ADDR_WIDTH(ADDR_W),
                 .DATA_WIDTH(DATA_W),
-                .SIMULATION(0),
-                .MACRO_NAME("")
+                .WRITE_SIZE(8),
+                .SIMULATION(0)
             ) u_sram (
                 .clk(clk_i),
                 // Port 0 (RW): used for write operations with byte enable

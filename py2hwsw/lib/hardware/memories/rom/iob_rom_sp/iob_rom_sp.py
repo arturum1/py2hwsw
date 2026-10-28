@@ -62,23 +62,32 @@ def setup(py_params_dict):
         "snippets": [
             {
                 "verilog_code": """
-    localparam INIT_RAM = (MEM_INIT_FILE_INT != "none.hex") ? 1 : 0;
-
-    // The bootrom is always implemented with the behavioral model, also in
-    // the ASIC flow. The hard macro alternative cannot be initialized with
-    // the content of the bootloader, which is required to boot the system.
-    // Declare the ROM
-    reg [DATA_W-1:0] rom[(2**ADDR_W)-1:0];
-    reg [DATA_W-1:0] r_data_int;
-
-    // Initialize the ROM
-    initial if (INIT_RAM) $readmemh( MEM_INIT_FILE_INT, rom, 0, (2 ** ADDR_W) - 1);
-
-    // Operate the ROM
-    always @(posedge clk_i) if (en_i)
-    r_data_int <= rom[addr_i];
-
-    assign r_data_o = r_data_int;
+    generate
+        if (MEM_ASIC) begin : g_asic
+            wire VPWR;
+            wire VGND;
+            rom_1rw_wrapper #(
+                .ADDR_WIDTH(ADDR_W),
+                .DATA_WIDTH(DATA_W),
+                .HEXFILE(MEM_INIT_FILE_INT),
+                .SIMULATION(0)
+            ) u_rom (
+                .clk  (clk_i),
+                .en   (en_i),
+                .addr (addr_i),
+                .dout (r_data_o),
+                .VPWR(VPWR),
+                .VGND(VGND)
+            );
+        end else begin : g_behavioral
+            localparam INIT_RAM = (MEM_INIT_FILE_INT != "none.hex") ? 1 : 0;
+            reg [DATA_W-1:0] rom[(2**ADDR_W)-1:0];
+            reg [DATA_W-1:0] r_data_int;
+            initial if (INIT_RAM) $readmemh( MEM_INIT_FILE_INT, rom, 0, (2 ** ADDR_W) - 1);
+            always @(posedge clk_i) if (en_i) r_data_int <= rom[addr_i];
+            assign r_data_o = r_data_int;
+        end
+    endgenerate
              """,
             },
         ],

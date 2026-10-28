@@ -248,5 +248,8 @@ pkgs.mkShell {
   shellHook = ''
     export PATH="$PATH:${bin_path}"
     export PYTHONPATH=${pythonEnv}/${pythonEnv.sitePackages}
+    export PDK_ROOT="''${PDK_ROOT:-$HOME/.ciel}"
+    export DRCLVS_HOME="''${DRCLVS_HOME:-not-found}"
+    export OPENRAM_TECH=/home/artur/iobundle/py2hwsw/lib/openram_tech/sky130
   '';
 }
