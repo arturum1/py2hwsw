@@ -94,11 +94,16 @@ check:
 # history of the CPU). The synthesis reads them from the design directory, so
 # they are copied from the simulation directory, where the setup of the core
 # puts them.
+OPENRAM_RECIPES ?= openram_recipes.json
+
+openram-gen: $(OPENRAM_RECIPES)
+	python3 openram_gen.py --recipes $(OPENRAM_RECIPES) --out . --config $(ASIC_CONFIG)
+
 init_mems:
 	@cp -f ../simulation/*.bin . 2>/dev/null || true
 
 # Full RTL to GDSII implementation
-build: check init_mems $(BUILD_DEPS)
+build: check init_mems openram-gen $(BUILD_DEPS)
 	librelane $(ASIC_CONFIG) $(ASIC_FLAGS)
 
 run: build
@@ -202,4 +207,4 @@ clean:
 	rm -rf runs gate_sim
 	rm -f $(ASIC_CONFIG)
 
-.PHONY: check check_tb build run drc lvs sta gui gate_netlist prepare_tb restore_tb sim-build sim-run sim report clean init_mems
+.PHONY: check check_tb build run drc lvs sta gui gate_netlist prepare_tb restore_tb sim-build sim-run sim report clean init_mems openram-gen

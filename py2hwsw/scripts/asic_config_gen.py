@@ -18,6 +18,13 @@ import re
 
 from iob_colors import ENDC, FAIL, INFO, OK, WARNING
 
+# OpenRAM recipe mapping (central fallback + per-memory hooks)
+try:
+    from openram_map import get_openram_recipe
+except Exception:
+    def get_openram_recipe(mem_info, params=None):
+        return None
+
 # Power/ground net names of the supported PDK families
 PDK_POWER_NETS = {
     "sky130": (["VPWR"], ["VGND"]),
@@ -330,7 +337,12 @@ def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
     memories = scan_memories(core)
     # The memories are only mapped to hard macros in the designs that
     # instantiate them, which are the ones built with the ASIC wrapper
-    macros = get_macros_config(memories, pdk) if top_name.endswith("_asic") else {}
+    macros = get_macros_config(memories, pdk) if (top_name.endswith("_asic") and MEMORY_STYLE == "pdk") else {}
+    # OpenRAM recipes generation for openram or behavioral mode
+    openram_recipes = []
+    if top_name.endswith("_asic") and MEMORY_STYLE == "openram":
+        openram_recipes = get_openram_recipes(memories)
+    # MACROS for openram is filled at build-time by openram-gen; leave empty at setup
 
     config = {
         "DESIGN_NAME": top_name,
@@ -354,10 +366,27 @@ def get_default_config(core, pdk="sky130A", clock_period=10, extra_config=None):
         # warnings that would abort the flow.
         "RUN_LINTER": bool(getattr(core, "global_project_vlint", True)),
     }
-    if macros:
-        config["MACROS"] = macros
+    config["MACROS"] = macros if macros else {}
+    config["OPENRAM_RECIPES"] = openram_recipes
     config.update(extra_config or {})
     return config
+
+
+def get_openram_recipes(memories):
+    recipes = []
+    for mem in memories:
+        try:
+            recipe = get_openram_recipe(mem, mem.get("parameters", {}))
+            if recipe:
+                # Resolve ROM hex path relative to asic dir (build-time)
+                if recipe.get("type") == "rom":
+                    hex_path = recipe.get("rom_data", "bootrom.hex")
+                    # Ensure absolute or relative path preserved
+                    pass
+                recipes.append(recipe)
+        except Exception as e:
+            print(f"{WARNING} Could not resolve OpenRAM recipe for '{mem.get('instance_name')}': {e}{ENDC}")
+    return recipes
 
 
 def write_config(config, asic_dir):
@@ -386,5 +415,12 @@ def asic_config_gen(core, pdk="sky130A", clock_period=10, extra_config=None):
         print(f"{WARNING} ASIC flow configuration not generated: {e}{ENDC}")
         return None
     config_path = write_config(config, asic_dir)
+    # Write openram recipes for build-time generation
+    recipes = config.get("OPENRAM_RECIPES", [])
+    if recipes:
+        recipes_path = os.path.join(asic_dir, "openram_recipes.json")
+        with open(recipes_path, "w") as f:
+            json.dump(recipes, f, indent=4)
+            f.write("\n")
     print(f"{OK} ASIC flow configuration written to '{config_path}'.{ENDC}")
     return config_path
