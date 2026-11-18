@@ -149,29 +149,31 @@ ASIC_AVAILABLE := $(shell which librelane 2>/dev/null)
 # 'hardware/asic/config.json'.
 ASIC_PDK ?= sky130A
 CLOCK_PERIOD ?= 10
+# Set ASIC_PADFRAME=0 to implement the padless core instead of the pad-ring wrapper
+ASIC_PADFRAME ?= 1
 # Extra flags forwarded to the ASIC flow makefile
 ASIC_FLAGS ?=
 
 asic-build:
-	make -C $(ASIC_DIR) build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) $(ASIC_FLAGS)
+	make -C $(ASIC_DIR) build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) ASIC_PADFRAME=$(ASIC_PADFRAME) $(ASIC_FLAGS)
 
 asic-drc:
-	make -C $(ASIC_DIR) drc ASIC_PDK=$(ASIC_PDK)
+	make -C $(ASIC_DIR) drc ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)
 
 asic-lvs:
-	make -C $(ASIC_DIR) lvs ASIC_PDK=$(ASIC_PDK)
+	make -C $(ASIC_DIR) lvs ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)
 
 asic-sta:
-	make -C $(ASIC_DIR) sta ASIC_PDK=$(ASIC_PDK)
+	make -C $(ASIC_DIR) sta ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)
 
 asic-gui:
-	make -C $(ASIC_DIR) gui ASIC_PDK=$(ASIC_PDK)
+	make -C $(ASIC_DIR) gui ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)
 
 asic-sim:
-	make -C $(ASIC_DIR) sim-run ASIC_PDK=$(ASIC_PDK)
+	make -C $(ASIC_DIR) sim-run ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=0
 
 asic-report:
-	make -C $(ASIC_DIR) report
+	make -C $(ASIC_DIR) report ASIC_PADFRAME=$(ASIC_PADFRAME)
 
 asic-clean:
 	if [ -f "$(ASIC_DIR)/Makefile" ]; then make -C $(ASIC_DIR) clean; fi

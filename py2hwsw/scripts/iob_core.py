@@ -365,6 +365,20 @@ class iob_core(iob_module, iob_instance):
                 import traceback
                 print(f"{iob_colors.WARNING} ASIC setup function failed: {e}{iob_colors.ENDC}")
                 traceback.print_exc()
+            try:
+                from asic_padframe_gen import asic_padframe_gen
+                asic_dir = os.path.join(self.build_dir, "hardware", "asic")
+                config_path = os.path.join(asic_dir, "config.json")
+                with open(config_path) as file:
+                    asic_config = json.load(file)
+                pad_config_path = os.path.join(asic_dir, "config_padframe.json")
+                if os.path.isfile(pad_config_path):
+                    os.remove(pad_config_path)
+                asic_padframe_gen(self, asic_config, asic_config.get("PDK", "sky130A"))
+            except Exception as e:
+                import traceback
+                print(f"{iob_colors.WARNING} Padframe generation failed: {e}{iob_colors.ENDC}")
+                traceback.print_exc()
         print(
             f"{iob_colors.INFO}Setup of '{self.original_name}' core successful. Generated build directory: '{self.build_dir}'.{iob_colors.ENDC}"
         )

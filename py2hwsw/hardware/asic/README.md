@@ -23,7 +23,9 @@ flow, formerly known as OpenLane 2) and an open source PDK.
   ```
 
   The PDK version compatible with the `librelane` in use is the `sky130` value
-  of the `pdk_hashes.yaml` file inside the `librelane` package.
+  of the `pdk_hashes.yaml` file inside the `librelane` package. The pad-ring
+  flow additionally requires a PDK revision containing
+  `libs.tech/librelane/sky130_ef_io/config.tcl`.
 
 ## Usage
 
@@ -49,6 +51,35 @@ make asic-build CORE=iob_timer BUILD_DIR=timer
 
 Results of a run are stored under `runs/<run tag>/`, and the final views
 (GDSII, LEF, DEF, netlists, reports) under `runs/<run tag>/final/`.
+
+## Padframe
+
+By default, the setup generates `<top>_pads.v` and `config_padframe.json`, and
+`asic-build` runs the LibreLane `chip` flow, which places a Sky130 pad ring
+around the core. Each logical RTL port is assigned to a fixed-tie
+`sky130_ef_io__gpiov2_pad`; inputs use `DM=001`, outputs use `DM=110`, and
+clamped power pads are added for the core and I/O supplies. The pad cells are
+connected to the top-level pad pins, so the GDSII contains the bond pads and
+their ESD/driver circuitry.
+
+To implement the original core without pads, set `ASIC_PADFRAME=0`:
+
+```bash
+make asic-build CORE=iob_timer BUILD_DIR=timer ASIC_PADFRAME=0
+```
+
+This selects `config.json` and the `classic` flow. `asic-sim` always builds and
+simulates the padless netlist, because the RTL testbench drives the core ports
+rather than the pad pins.
+
+The pad-ring dimensions are derived from the number of pad sites required on
+each side. Override them with `ASIC_PAD_GAP`, `ASIC_DIE_AREA`, and
+`ASIC_CORE_AREA`, or with LibreLane configuration overrides in
+`ASIC_EXTRA_FLAGS`, for example:
+
+```bash
+make asic-build ASIC_EXTRA_FLAGS="-c DIE_AREA='0 0 3000 3000' -c CORE_AREA='400 400 2600 2600'"
+```
 
 ## Gate-level simulation
 
@@ -77,19 +108,24 @@ make -C timer_core/hardware/asic sim-run
 
 `config.json` is generated during the setup of the build directory and holds the
 design name, the Verilog sources, the clock port/period and the target
-technology. The following variables, defined in this directory's `Makefile`,
-override the generated configuration:
+technology. `config_padframe.json` additionally selects the pad-ring wrapper,
+pad cells, side assignments, and die/core areas. The following variables,
+defined in this directory's `Makefile`, override the generated configuration:
 
 | Variable        | Default value | Description                                       |
 | --------------- | ------------- | ------------------------------------------------- |
+| `ASIC_PADFRAME` | `1`           | Generate and implement the pad-ring wrapper (`0` for padless core) |
 | `ASIC_PDK`      | `sky130A`     | PDK variant to implement for                      |
 | `ASIC_SCL`      | PDK default   | Standard cell library to use                      |
 | `CLOCK_PERIOD`  | `10`          | Clock period (ns) of the main clock domain         |
-| `ASIC_FLOW`     | `classic`     | LibreLane flow to run                             |
+| `ASIC_FLOW`     | `chip`/`classic` | LibreLane flow, chosen from `ASIC_PADFRAME`    |
 | `ASIC_RUN_TAG`  | core name     | Name of the run directory                         |
 | `ASIC_JOBS`     | `4`           | Maximum number of threads/processes used          |
 | `ASIC_TB`       | `$(NAME)_tb.v`| Testbench file used in gate-level simulation      |
 | `ASIC_EXTRA_FLAGS` |            | Extra configuration overrides of the flow          |
+| `ASIC_PAD_GAP`  | `2`           | Minimum gap between pad cells, in pad sites       |
+| `ASIC_DIE_AREA` | auto          | Comma-separated die area overrides                |
+| `ASIC_CORE_AREA`| auto          | Comma-separated core area overrides               |
 
 Any other flow variable can be set in the generated configuration, or
 overridden on the command line, for example:
@@ -104,7 +140,7 @@ defaults because of issues observed with the open source PDKs:
 | Variable                  | Value | Reason                                                                                  |
 | ------------------------- | ----- | ---------------------------------------------------------------------------------------- |
 | `MAX_FANOUT_CONSTRAINT`   | `16`  | Without it, the post-layout timing reports max slew violations on the slowest corners     |
-| `IO_DELAY_CONSTRAINT`     | `10`  | Percentage of the clock period for the I/O paths. The PDK value (20%) is meant for chip-level I/O pads |
+| `IO_DELAY_CONSTRAINT`     | `10` / `20` | Percentage of the clock period for the I/O paths. The padless flow uses 10%; the padframe flow uses the PDK value of 20% |
 | `FP_CORE_UTIL`            | `40`  | Leaves room for the buffers that the resizer inserts before detailed routing              |
 | `PL_OPTIMIZE_MIRRORING`   | `0`   | Mirroring during detailed placement can leave overlaps that the flow cannot legalize     |
 | `TIMING_VIOLATION_CORNERS` | `*` | The PDK defaults restrict the timing violation checkers to the typical corners, which hides violations at the slow/fast corners of the post-layout timing |
@@ -118,4 +154,5 @@ A core or a user can add or override settings by providing an `asic_build.mk`
 file in this directory (it is included by the `Makefile`, if it exists), or by
 providing a `hardware/asic/asic_setup.py` file in the core's directory (it is
 executed at the end of the build directory setup, with the `setup_module`
-variable referring to the core object, and can modify `config.json`).
+variable referring to the core object, and can modify the generated
+configurations).

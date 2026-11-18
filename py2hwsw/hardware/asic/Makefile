@@ -10,9 +10,18 @@ SHELL:=bash
 
 include ../../config_build.mk
 
-# Flow selection: 'classic' goes from RTL to GDSII, 'optimizing' and the
-# 'openin*' flows are debug/GUI flows.
+# Pad-ring selection. Set ASIC_PADFRAME=0 to generate the padless GDS of the
+# core itself; the default wraps the core in a Sky130 pad ring.
+ASIC_PADFRAME ?= 1
+ifeq ($(strip $(ASIC_PADFRAME)),1)
+ASIC_FLOW ?= chip
+ASIC_CONFIG ?= config_padframe.json
+else ifeq ($(strip $(ASIC_PADFRAME)),0)
 ASIC_FLOW ?= classic
+ASIC_CONFIG ?= config.json
+else
+$(error ASIC_PADFRAME must be 0 or 1)
+endif
 # Process design kit and standard cell library to target.
 ASIC_PDK ?= sky130A
 ASIC_SCL ?=
@@ -22,8 +31,6 @@ CLOCK_PERIOD ?= 10
 ASIC_RUN_TAG ?= $(DESIGN_NAME)
 # Maximum number of threads/processes used by the flow.
 ASIC_JOBS ?= 4
-# Name of the LibreLane configuration file generated during setup.
-ASIC_CONFIG ?= config.json
 
 ASIC_FLOW := $(shell echo $(ASIC_FLOW) | tr 'A-Z' 'a-z')
 ASIC_FLAGS += -f $(ASIC_FLOW) --design-dir . -j $(ASIC_JOBS)
@@ -86,9 +93,12 @@ endif
 # Check that the tools and inputs are available before starting a long run
 check:
 	@which librelane >/dev/null || { echo "ERROR: 'librelane' not found in PATH."; exit 1; }
-	@test -f $(ASIC_CONFIG) || { echo "ERROR: '$(ASIC_CONFIG)' not found. Re-run the setup."; exit 1; }
+	@test -f $(ASIC_CONFIG) || { echo "ERROR: '$(ASIC_CONFIG)' not found. Re-run the setup with a pad-capable PDK for ASIC_PADFRAME=1."; exit 1; }
 	@test -d ../src || { echo "ERROR: '../src' not found. Re-run the setup."; exit 1; }
 	@test -n "$$(ls ../src/*.v 2>/dev/null)" || { echo "ERROR: no Verilog sources in '../src'."; exit 1; }
+ifeq ($(strip $(ASIC_PADFRAME)),1)
+	@grep -q '"PAD_SOUTH"' $(ASIC_CONFIG) || { echo "ERROR: '$(ASIC_CONFIG)' has no pad-ring settings. Re-run the setup."; exit 1; }
+endif
 
 # The design may read memory initialization files (e.g. the branch predictor
 # history of the CPU). The synthesis reads them from the design directory, so
@@ -200,6 +210,6 @@ report:
 
 clean:
 	rm -rf runs gate_sim
-	rm -f $(ASIC_CONFIG)
+	rm -f config.json config_padframe.json *_pads.v
 
 .PHONY: check check_tb build run drc lvs sta gui gate_netlist prepare_tb restore_tb sim-build sim-run sim report clean init_mems

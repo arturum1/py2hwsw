@@ -54,6 +54,7 @@ PY_PARAMS:=$(shell echo $(PY_PARAMS) | cut -c2-)
 # design to the requirements of the flow (hard macros for the memories, power
 # nets, etc.). Set 'ASIC_WRAPPER=0' to disable it.
 ASIC_WRAPPER?=1
+ASIC_PADFRAME?=1
 ASIC_PY_PARAMS:=$(PY_PARAMS):asic_wrapper=$(ASIC_WRAPPER)
 ASIC_PY_PARAMS:=$(shell echo $(ASIC_PY_PARAMS) | sed 's/^://')
 # Parameters used by the default setup. Overridden by the ASIC targets.
@@ -104,29 +105,31 @@ ASIC_PDK?=sky130A
 CLOCK_PERIOD?=10
 asic-build: SETUP_PY_PARAMS=$(ASIC_PY_PARAMS)
 asic-build: clean setup
-	nix-shell --run "make -C $(BUILD_DIR) asic-build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) $(ASIC_FLAGS)"
+	nix-shell --run "make -C $(BUILD_DIR) asic-build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) ASIC_PADFRAME=$(ASIC_PADFRAME) $(ASIC_FLAGS)"
 
 asic-run: asic-build
 
 asic-drc: asic-build
-	nix-shell --run "make -C $(BUILD_DIR) asic-drc ASIC_PDK=$(ASIC_PDK)"
+	nix-shell --run "make -C $(BUILD_DIR) asic-drc ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)"
 
 asic-lvs: asic-build
-	nix-shell --run "make -C $(BUILD_DIR) asic-lvs ASIC_PDK=$(ASIC_PDK)"
+	nix-shell --run "make -C $(BUILD_DIR) asic-lvs ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)"
 
 asic-sta: asic-build
-	nix-shell --run "make -C $(BUILD_DIR) asic-sta ASIC_PDK=$(ASIC_PDK)"
+	nix-shell --run "make -C $(BUILD_DIR) asic-sta ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)"
 
 # Interactive viewer of the layout of the last run
 asic-gui: asic-build
-	nix-shell --run "make -C $(BUILD_DIR) asic-gui ASIC_PDK=$(ASIC_PDK)"
+	nix-shell --run "make -C $(BUILD_DIR) asic-gui ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=$(ASIC_PADFRAME)"
 
 # Gate-level simulation of the place-and-route netlist, with the core's testbench
-asic-sim: asic-build
-	nix-shell --run "make -C $(BUILD_DIR) asic-sim"
+asic-sim: SETUP_PY_PARAMS=$(ASIC_PY_PARAMS)
+asic-sim: clean setup
+	nix-shell --run "make -C $(BUILD_DIR) asic-build ASIC_PDK=$(ASIC_PDK) CLOCK_PERIOD=$(CLOCK_PERIOD) ASIC_PADFRAME=0 $(ASIC_FLAGS)"
+	nix-shell --run "make -C $(BUILD_DIR) asic-sim ASIC_PDK=$(ASIC_PDK) ASIC_PADFRAME=0"
 
 asic-report: asic-build
-	nix-shell --run "make -C $(BUILD_DIR) asic-report"
+	nix-shell --run "make -C $(BUILD_DIR) asic-report ASIC_PADFRAME=$(ASIC_PADFRAME)"
 
 asic-clean:
 	if [ -f "$(BUILD_DIR)/hardware/asic/Makefile" ]; then nix-shell --run "make -C $(BUILD_DIR) asic-clean"; fi
